@@ -1,0 +1,17 @@
+account:
+  email: ""
+  username: "your_username"
+  password: "your_password"
+queries:
+  - query: "python programming"
+    max_year: 2024
+    limit: 10
+  - query: "data science"
+    max_year: 2024
+    limit: 10
+  - query: "romance novels"
+    max_year: 2024
+    limit: 10
+  - query: "history books"
+    max_year: 2024
+    limit: 10
