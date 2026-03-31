@@ -1,5 +1,5 @@
-from playwright.sync_api import Browser as PWBrowser
-from playwright.sync_api import Playwright, sync_playwright
+from playwright.async_api import Browser as PWBrowser, Playwright as AsyncPlaywright
+from playwright.async_api import async_playwright
 
 
 class Browser:
@@ -14,27 +14,36 @@ class Browser:
         if getattr(self, "_initialized", False):
             return
 
-        self._playwright_ctx = sync_playwright()
-        self._playwright: Playwright | None = None
+        self._playwright: AsyncPlaywright | None = None
         self._browser: PWBrowser | None = None
+        self._page = None
         self._initialized = True
 
     @classmethod
     def get_instance(cls) -> "Browser":
         return cls()
 
-    def get_browser(self) -> PWBrowser:
+    async def get_browser(self) -> PWBrowser:
         if self._browser is None:
-            self._playwright = self._playwright_ctx.start()
-            self._browser = self._playwright.chromium.launch(headless=False)
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(headless=False)
         return self._browser
 
-    def close(self) -> None:
+    async def get_page(self):
+        if self._page is None:
+            browser = await self.get_browser()
+            self._page = await browser.new_page()
+        return self._page
+
+    async def close(self) -> None:
+        if self._page is not None:
+            await self._page.close()
+            self._page = None
+
         if self._browser is not None:
-            self._browser.close()
+            await self._browser.close()
             self._browser = None
 
         if self._playwright is not None:
-            self._playwright.stop()
+            await self._playwright.stop()
             self._playwright = None
-
