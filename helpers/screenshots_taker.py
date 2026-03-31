@@ -1,4 +1,4 @@
-from playwright.sync_api import Page
+from playwright.async_api import Page
 
 def screenshots_path():
     from pathlib import Path
@@ -7,7 +7,7 @@ def screenshots_path():
     return path
 
 
-def take_screenshot(page: Page, name: str):
+async def take_screenshot(page: Page, name: str):
     path = screenshots_path() / f"{name}.png"
-    page.screenshot(path=path)
+    await page.screenshot(path=path)
     print(f"Screenshot saved to: {path}")
