@@ -1,7 +1,7 @@
 account:
-  email: ""
-  username: "your_username"
-  password: "your_password"
+  email: "REDACTED_EMAIL"
+  username: "REDACTED_USERNAME"
+  password: "REDACTED_PASSWORD"
 queries:
   - query: "python programming"
     max_year: 2024
