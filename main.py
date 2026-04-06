@@ -1,9 +1,5 @@
-from helpers.logger import print_error, print_info
+from helpers.logger import Logger, print_error
 from methods.orchestrator import orchestrator
-from methods.search_books_by_title_under_year import search_books_by_title_under_year
-from methods.add_books_to_reading_list import add_books_to_reading_list
-from methods.assert_reading_list_count import assert_reading_list_count
-from pages.inheriting_pages.profile_page import ProfilePage
 from helpers.browser import Browser
 
 import asyncio
@@ -11,7 +7,7 @@ import asyncio
 
 async def main():
     browser = Browser.get_instance()
-
+    logger = Logger()
     try:
         await orchestrator()
     except Exception as e:
@@ -19,5 +15,6 @@ async def main():
 
     finally:
         await browser.close()
+        logger.save_logs()
 
 asyncio.run(main())
