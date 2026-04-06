@@ -28,7 +28,7 @@ class BookPage(BasePage):
         await self.page.goto(self.book_url)
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
 
-    async def click_master_reading_button(self, title: str) -> bool:
+    async def click_master_reading_button(self, title: str) -> bool | str:
         await self.page.wait_for_selector(book_page_selector["master button"])
         master_element = await self.page.query_selector(
             book_page_selector["master button active"])
@@ -44,8 +44,12 @@ class BookPage(BasePage):
                 return True
             return False
 
-        elif (await master_element.inner_text()).strip().lower() == title.lower():
+        element_title = (await master_element.inner_text()).strip().lower()
+        if element_title == title.lower():
             return True
+        elif element_title != title.lower():
+            return element_title
+
         return False
 
     async def invert_reading_buttons(self) -> None:
@@ -54,7 +58,7 @@ class BookPage(BasePage):
         if arrow_element is not None:
             await arrow_element.click()
 
-    async def click_a_reading_button(self, title: str) -> None:
+    async def click_a_reading_button(self, title: str) -> bool:
         button_elements = await self.page.query_selector_all(
             book_page_selector["buttons elements"])
 
@@ -63,16 +67,46 @@ class BookPage(BasePage):
                 if not await button.is_visible():
                     await self.invert_reading_buttons()
                 await button.click()
-                return
+                return True
+        return False
 
-    async def set_book_as_want_to_read(self) -> None:
-        if not await self.click_master_reading_button("Want to Read"):
-            await self.click_a_reading_button("Want to Read")
+    async def set_book_as_want_to_read(self) -> int:
+        result = await self.click_master_reading_button("Want to Read")
+        if result is not True:
+            res = await self.click_a_reading_button("Want to Read")
+            if res:
+                result = True
 
-    async def set_book_as_already_read(self) -> None:
-        if not await self.click_master_reading_button("Already Read"):
-            await self.click_a_reading_button("Already Read")
+        if result == False:
+            return 0
+        elif result is True:
+            return 1
+        else:
+            return -1
 
-    async def set_book_as_currently_reading(self) -> None:
-        if not await self.click_master_reading_button("Currently Reading"):
-            await self.click_a_reading_button("Currently Reading")
+    async def set_book_as_already_read(self) -> int:
+        result = await self.click_master_reading_button("Already Read")
+        if result is not True:
+            res = await self.click_a_reading_button("Already Read")
+            if res:
+                result = True
+        if result == False:
+            return 0
+        elif result is True:
+            return 1
+        else:
+            return -1
+
+    async def set_book_as_currently_reading(self) -> int:
+        result = await self.click_master_reading_button("Currently Reading")
+        if result is not True:
+            res = await self.click_a_reading_button("Currently Reading")
+            if res:
+                result = True
+
+        if result == False:
+            return 0
+        elif result is True:
+            return 1
+        else:
+            return -1
