@@ -42,7 +42,7 @@ class HomePage(BasePage):
         await self.page.fill(home_page_selectors["input_search"], query)
         await self.page.wait_for_selector(home_page_selectors["search_button"])
         await self.page.click(home_page_selectors["search_button"])
-        await self.take_screenshot(f"search_results_page_{1}", title_to_filename(query))
+        await self.take_screenshot(f"search_results_page_{1}", title_to_filename(f"{title}_{author}_{year}"))
 
         return SearchResultsPage(self.page, query)
 
