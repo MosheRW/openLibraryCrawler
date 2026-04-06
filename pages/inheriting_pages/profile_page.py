@@ -1,5 +1,6 @@
 from playwright.async_api import Page
 from helpers.logger import Log, print_error, print_info
+from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
@@ -21,6 +22,9 @@ class ProfilePage(BasePage):
         instance = cls(await Browser.get_instance().get_page())
         await instance.navigate("REDACTED_USERNAME")
         await instance.initialize()
+        des = await measure_page_performance(instance.page, instance.page.url, 2000)
+        instance.logger.add_log(Log(url=instance.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
         return instance
 
     async def navigate(self, username: str) -> None:
@@ -54,7 +58,12 @@ class ProfilePage(BasePage):
     async def get_already_read_quantity(self) -> int:
         return await self._get_quantity("already read count")
 
-    async def get_want_and_already_read_quantities(self) -> tuple[int, int]:
+    async def get_want_and_already_read_quantities(self, title: str | None = None) -> tuple[int, int]:
+        # await self.take_screenshot(query="profile_page_quantities" if title is None else f"profile_page_quantities_{title_to_filename(title)}")
+        if title is not None:
+            await self.take_screenshot(name=title_to_filename(title), query="profile_page_quantities")
+        else:
+            await self.take_screenshot(name="profile_page_quantities")
         # await self.page.reload()
         want_to_read = await self.get_want_to_read_quantity()
         already_read = await self.get_already_read_quantity()
