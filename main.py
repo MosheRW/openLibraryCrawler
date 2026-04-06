@@ -1,3 +1,4 @@
+from helpers.logger import print_error, print_info
 from pages.inheriting_pages.book_page import BookPage
 from pages.inheriting_pages.home_page import HomePage
 from pages.inheriting_pages.profile_page import ProfilePage
@@ -19,7 +20,6 @@ async def add_books_to_reading_list(urls: list[str]):
     if not urls:
         return want_to_read, already_read
 
-    # Reuse a single browser page and just navigate it to each next book URL.
     book_page = await BookPage.create(urls[0])
     for index, url in enumerate(urls):
         if index > 0:
@@ -41,19 +41,27 @@ async def assert_reading_list_count(expected_want_to_read: int, expected_already
     actual_want_to_read = await profile_page.get_want_to_read_quantity()
     actual_already_read = await profile_page.get_already_read_quantity()
 
-    assert actual_want_to_read == expected_want_to_read, f"Expected {expected_want_to_read} books in 'Want to Read', but found {actual_want_to_read}."
-    assert actual_already_read == expected_already_read, f"Expected {expected_already_read} books in 'Already Read', but found {actual_already_read}."
+    assert actual_want_to_read == expected_want_to_read and actual_already_read == expected_already_read, f"Expected {expected_want_to_read} books in 'Want to Read' and {expected_already_read} books in 'Already Read', but found {actual_want_to_read} and {actual_already_read}."
+    print_info(
+        f"Assertion passed: {actual_want_to_read} books in 'Want to Read' and {actual_already_read} books in 'Already Read' as expected.")
 
 
 async def main():
     browser = Browser.get_instance()
 
     try:
-        urls = await search_books_by_title_under_year("The Great Gatsby", 2026, limit=5)
+        urls = await search_books_by_title_under_year("harry potter", 2026, limit=40)
+        print_info(f"Found {len(urls)} books matching criteria")
+        unique_urls = list(url.split('/')[4]
+                           for url in urls if url is not None)
+        print_info(f"Unique book identifiers: {len(set(unique_urls))}")
+        profile_page = await ProfilePage.create()
+        await profile_page.remove_all_books_from_shelves()
         want_to_read, already_read = await add_books_to_reading_list(urls)
         await assert_reading_list_count(want_to_read, already_read)
-        print(
-            f"Test passed: {want_to_read} books added to 'Want to Read' and {already_read} books added to 'Already Read'.")
+    except Exception as e:
+        print_error(f"An error occurred: {e}")
+
     finally:
         await browser.close()
 

@@ -56,7 +56,6 @@ class AuthPage:
         if self.page is None:
             raise ValueError("Page instance is not initialized.")
 
-        print("Checking if user is already logged in...")
         login_buttons = await self.page.query_selector_all(
             auth_page_selector["login_buttons"])
 
@@ -68,8 +67,6 @@ class AuthPage:
                 self.is_logged_in = False
                 break
 
-        if self.is_logged_in:
-            print("User is already logged in.")
         return self.is_logged_in
 
     async def _await_page_load(self) -> None:

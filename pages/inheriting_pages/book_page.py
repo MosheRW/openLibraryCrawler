@@ -24,11 +24,12 @@ class BookPage(BasePage):
         await instance.initialize()
         return instance
 
-    
     async def navigate(self) -> None:
         await self.page.goto(self.book_url)
+        await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
 
     async def click_master_reading_button(self, title: str) -> bool:
+        await self.page.wait_for_selector(book_page_selector["master button"])
         master_element = await self.page.query_selector(
             book_page_selector["master button active"])
         if master_element is None:
@@ -63,9 +64,6 @@ class BookPage(BasePage):
                     await self.invert_reading_buttons()
                 await button.click()
                 return
-
-        await self.page.click(
-            book_page_selector["add_to_reading_list_button"], timeout=5000)
 
     async def set_book_as_want_to_read(self) -> None:
         if not await self.click_master_reading_button("Want to Read"):
