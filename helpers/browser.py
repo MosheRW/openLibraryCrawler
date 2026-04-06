@@ -1,9 +1,12 @@
 from playwright.async_api import Browser as PWBrowser, Playwright as AsyncPlaywright
 from playwright.async_api import async_playwright
 
+from helpers.configs import Config
+
 
 class Browser:
     _instance = None
+    _config = Config()
 
     def __new__(cls):
         if cls._instance is None:
@@ -27,7 +30,7 @@ class Browser:
         if self._browser is None:
             self._playwright = await async_playwright().start()
             # self._browser = await self._playwright.chromium.launch(headless=False)
-            self._browser = await self._playwright.chromium.launch(headless=True)
+            self._browser = await self._playwright.chromium.launch(headless=self._config.settings.headless)
         return self._browser
 
     async def get_page(self):
