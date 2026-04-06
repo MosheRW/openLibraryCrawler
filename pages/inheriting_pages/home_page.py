@@ -5,6 +5,12 @@ from pages.inheriting_pages.base_page import BasePage
 from pages.inheriting_pages.search_results_page import SearchResultsPage
 
 
+home_page_selectors = {
+    "input_search": "input[name='q']",
+    "search_button": "input.search-bar-submit[type='submit']"
+}
+
+
 class HomePage(BasePage):
     def __init__(self, page: Page):
         super().__init__(page)
@@ -32,10 +38,10 @@ class HomePage(BasePage):
     async def _search_books(self, title: str | None = None, author: str | None = None, year: int | None = None, limit: int = 5) -> SearchResultsPage:
         query = self._build_query(title, author, year)
         await self.navigate()
-        await self.page.wait_for_selector("input[name='q']")
-        await self.page.fill("input[name='q']", query)
-        await self.page.wait_for_selector("input.search-bar-submit[type='submit']")
-        await self.page.click("input.search-bar-submit[type='submit']")
+        await self.page.wait_for_selector(home_page_selectors["input_search"])
+        await self.page.fill(home_page_selectors["input_search"], query)
+        await self.page.wait_for_selector(home_page_selectors["search_button"])
+        await self.page.click(home_page_selectors["search_button"])
         await self.take_screenshot(f"search_results_page_{1}", title_to_filename(query))
 
         return SearchResultsPage(self.page, query)
