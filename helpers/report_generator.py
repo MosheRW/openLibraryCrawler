@@ -2,16 +2,66 @@ import json
 from pathlib import Path
 
 
+def _deduplicate(data: list) -> list:
+    seen = set()
+    result = []
+    for e in data:
+        key = (e["url"], e["page"])
+        if key not in seen:
+            seen.add(key)
+            result.append(e)
+    return result
+
+
+def _screenshot_section(screenshots_dir: Path) -> str:
+    if not screenshots_dir.exists():
+        return ""
+
+    book_shots = sorted(screenshots_dir.glob("*.png"))
+    if not book_shots:
+        return ""
+
+    items = ""
+    for shot in book_shots:
+        title = shot.stem.replace("_", " ").replace("  ", " ").strip()
+        src = f"screenshots/{shot.name}"
+        items += f"""
+        <div class="gallery-item" onclick="openLightbox('{src}', '{title}')">
+          <img src="{src}" alt="{title}" loading="lazy">
+          <div class="gallery-label">{title}</div>
+        </div>"""
+
+    return f"""
+  <section>
+    <h2>Book Page Screenshots ({len(book_shots)})</h2>
+    <div class="gallery-grid">
+      {items}
+    </div>
+  </section>
+
+  <!-- Lightbox -->
+  <div id="lightbox" onclick="closeLightbox()">
+    <div class="lb-inner" onclick="event.stopPropagation()">
+      <button class="lb-close" onclick="closeLightbox()">&#x2715;</button>
+      <img id="lb-img" src="" alt="">
+      <div id="lb-caption"></div>
+    </div>
+  </div>"""
+
+
 def generate_report(results_path: Path) -> None:
     report_json = results_path / "performance_report.json"
     if not report_json.exists():
         return
 
     with open(report_json) as f:
-        data = json.load(f)
+        raw = json.load(f)
 
-    if not data:
+    if not raw:
         return
+
+    data = _deduplicate(raw)
+    duplicates_removed = len(raw) - len(data)
 
     total = len(data)
     passed = sum(1 for e in data if e["is_within_threshold"])
@@ -38,7 +88,7 @@ def generate_report(results_path: Path) -> None:
     for i, e in enumerate(data):
         status = "pass" if e["is_within_threshold"] else "fail"
         label = "PASS" if e["is_within_threshold"] else "FAIL"
-        short_url = e["url"].replace("https://openlibrary.org", "…")
+        short_url = e["url"].replace("https://openlibrary.org", "...")
         table_rows += f"""
         <tr class="{status}-row" data-load="{e['load_time_ms']}" data-fp="{e['first_paint_ms']}" data-dcl="{e['dom_content_loaded_ms']}">
             <td class="num">{i + 1}</td>
@@ -69,12 +119,15 @@ def generate_report(results_path: Path) -> None:
             </div>
         </div>"""
 
+    dedup_notice = f'<span class="dedup-note">{duplicates_removed} duplicate entries removed</span>' if duplicates_removed else ""
+    screenshot_html = _screenshot_section(results_path / "screenshots")
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Performance Report &mdash; {timestamp}</title>
+<title>Performance Report -- {timestamp}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -102,11 +155,17 @@ def generate_report(results_path: Path) -> None:
   .header-left h1 {{ font-size: 1.75rem; font-weight: 700; letter-spacing: -.5px; }}
   .header-left h1 span {{ color: #a5b4fc; }}
   .header-left p {{ color: var(--muted); margin-top: .35rem; font-size: .875rem; }}
+  .dedup-note {{
+    display: inline-block; margin-left: .75rem; padding: .15rem .6rem;
+    background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.3);
+    color: var(--yellow); border-radius: 99px; font-size: .7rem; font-weight: 600;
+  }}
   .pass-rate-big {{ text-align: right; }}
   .pass-rate-big .rate {{ font-size: 4rem; font-weight: 800; line-height: 1;
     background: linear-gradient(135deg, var(--green), #86efac);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }}
-  .pass-rate-big .rate.bad {{ background: linear-gradient(135deg, var(--red), #fca5a5); }}
+  .pass-rate-big .rate.bad {{ background: linear-gradient(135deg, var(--red), #fca5a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }}
   .pass-rate-big .rate-label {{ color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; margin-top: .2rem; }}
 
   /* ── Layout ── */
@@ -161,6 +220,47 @@ def generate_report(results_path: Path) -> None:
   .pt-meta {{ display: flex; gap: 1rem; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }}
   .pt-meta strong {{ color: var(--text); }}
 
+  /* ── Screenshot gallery ── */
+  .gallery-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }}
+  .gallery-item {{
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; cursor: pointer; transition: transform .2s, box-shadow .2s;
+  }}
+  .gallery-item:hover {{ transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,.5); border-color: var(--accent); }}
+  .gallery-item img {{ width: 100%; height: 130px; object-fit: cover; object-position: top; display: block; }}
+  .gallery-label {{
+    padding: .5rem .75rem; font-size: .7rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border-top: 1px solid var(--border);
+  }}
+
+  /* ── Lightbox ── */
+  #lightbox {{
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    z-index: 1000; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }}
+  #lightbox.open {{ display: flex; }}
+  .lb-inner {{
+    position: relative; max-width: 90vw; max-height: 90vh;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }}
+  .lb-inner img {{ max-width: 90vw; max-height: 80vh; object-fit: contain; display: block; }}
+  #lb-caption {{ padding: .75rem 1rem; font-size: .8rem; color: var(--muted); text-align: center; }}
+  .lb-close {{
+    position: absolute; top: .75rem; right: .75rem;
+    background: rgba(0,0,0,.6); border: 1px solid var(--border); color: var(--text);
+    border-radius: 50%; width: 2rem; height: 2rem; cursor: pointer;
+    font-size: 1rem; display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+  }}
+  .lb-close:hover {{ background: var(--red); border-color: var(--red); }}
+
   /* ── Table ── */
   .table-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }}
   table {{ width: 100%; border-collapse: collapse; font-size: .875rem; }}
@@ -168,8 +268,7 @@ def generate_report(results_path: Path) -> None:
   th {{
     padding: .9rem 1rem; text-align: left; font-size: .75rem; font-weight: 600;
     text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
-    cursor: pointer; user-select: none; white-space: nowrap;
-    transition: color .15s;
+    cursor: pointer; user-select: none; white-space: nowrap; transition: color .15s;
   }}
   th:hover {{ color: var(--text); }}
   th.sorted {{ color: var(--accent); }}
@@ -210,7 +309,7 @@ def generate_report(results_path: Path) -> None:
 <header class="header">
   <div class="header-left">
     <h1>Performance <span>Report</span></h1>
-    <p>Run &nbsp;<code>{timestamp}</code>&nbsp;&middot;&nbsp;{total} pages measured &middot; openlibrary.org</p>
+    <p>Run <code>{timestamp}</code> &nbsp;&#183;&nbsp; {total} pages measured &nbsp;&#183;&nbsp; openlibrary.org {dedup_notice}</p>
   </div>
   <div class="pass-rate-big">
     <div class="rate {'bad' if pass_rate < 50 else ''}">{pass_rate}%</div>
@@ -242,7 +341,7 @@ def generate_report(results_path: Path) -> None:
       <div class="kpi-card yellow">
         <div class="kpi-label">Avg Load Time</div>
         <div class="kpi-value">{avg_load}<span class="kpi-unit">ms</span></div>
-        <div class="kpi-sub">FP avg {avg_fp}ms &middot; DCL avg {avg_dcl}ms</div>
+        <div class="kpi-sub">FP avg {avg_fp}ms &nbsp;&#183;&nbsp; DCL avg {avg_dcl}ms</div>
       </div>
     </div>
   </section>
@@ -276,6 +375,8 @@ def generate_report(results_path: Path) -> None:
     </div>
   </section>
 
+  {screenshot_html}
+
   <!-- Table -->
   <section>
     <h2>All Measurements</h2>
@@ -302,11 +403,10 @@ def generate_report(results_path: Path) -> None:
 </div>
 
 <footer>
-  Generated by openLibraryCrawler &mdash; {timestamp}
+  Generated by openLibraryCrawler -- {timestamp}
 </footer>
 
 <script>
-  // Donut chart
   new Chart(document.getElementById('donutChart'), {{
     type: 'doughnut',
     data: {{
@@ -314,12 +414,15 @@ def generate_report(results_path: Path) -> None:
       datasets: [{{ data: [{passed}, {failed}], backgroundColor: ['#22c55e', '#ef4444'], borderColor: ['#166534', '#991b1b'], borderWidth: 2 }}]
     }},
     options: {{
-      cutout: '70%', plugins: {{ legend: {{ position: 'bottom', labels: {{ color: '#94a3b8', font: {{ size: 12 }} }} }}, tooltip: {{ callbacks: {{ label: ctx => ` ${{ctx.label}}: ${{ctx.parsed}}` }} }} }},
+      cutout: '70%',
+      plugins: {{
+        legend: {{ position: 'bottom', labels: {{ color: '#94a3b8', font: {{ size: 12 }} }} }},
+        tooltip: {{ callbacks: {{ label: ctx => ' ' + ctx.label + ': ' + ctx.parsed }} }}
+      }},
       animation: {{ animateRotate: true, duration: 800 }}
     }}
   }});
 
-  // Bar chart
   new Chart(document.getElementById('barChart'), {{
     type: 'bar',
     data: {{
@@ -332,7 +435,10 @@ def generate_report(results_path: Path) -> None:
     }},
     options: {{
       responsive: true,
-      plugins: {{ legend: {{ labels: {{ color: '#94a3b8', font: {{ size: 11 }} }} }}, tooltip: {{ callbacks: {{ label: ctx => ` ${{ctx.dataset.label}}: ${{ctx.parsed.y}}ms` }} }} }},
+      plugins: {{
+        legend: {{ labels: {{ color: '#94a3b8', font: {{ size: 11 }} }} }},
+        tooltip: {{ callbacks: {{ label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + 'ms' }} }}
+      }},
       scales: {{
         x: {{ ticks: {{ color: '#64748b', font: {{ size: 10 }}, maxRotation: 45 }}, grid: {{ color: '#1e2235' }} }},
         y: {{ ticks: {{ color: '#64748b', callback: v => v + 'ms' }}, grid: {{ color: '#1e2235' }} }}
@@ -341,8 +447,6 @@ def generate_report(results_path: Path) -> None:
     }}
   }});
 
-  // Table sort
-  const colMap = {{ fp: 'fp', dcl: 'dcl', load: 'load' }};
   let sortCol = null, sortAsc = true;
   document.querySelectorAll('th[data-col]').forEach(th => {{
     th.addEventListener('click', () => {{
@@ -350,7 +454,7 @@ def generate_report(results_path: Path) -> None:
       if (sortCol === col) sortAsc = !sortAsc; else {{ sortCol = col; sortAsc = true; }}
       document.querySelectorAll('th[data-col]').forEach(t => t.classList.remove('sorted'));
       th.classList.add('sorted');
-      th.querySelector('.sort-icon').textContent = sortAsc ? '↑' : '↓';
+      th.querySelector('.sort-icon').textContent = sortAsc ? '\u2191' : '\u2193';
       const tbody = document.querySelector('#resultsTable tbody');
       const rows = [...tbody.querySelectorAll('tr')];
       const attr = col === 'fp' ? 'data-fp' : col === 'dcl' ? 'data-dcl' : 'data-load';
@@ -358,6 +462,17 @@ def generate_report(results_path: Path) -> None:
       rows.forEach(r => tbody.appendChild(r));
     }});
   }});
+
+  function openLightbox(src, caption) {{
+    document.getElementById('lb-img').src = src;
+    document.getElementById('lb-caption').textContent = caption;
+    document.getElementById('lightbox').classList.add('open');
+  }}
+  function closeLightbox() {{
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lb-img').src = '';
+  }}
+  document.addEventListener('keydown', e => {{ if (e.key === 'Escape') closeLightbox(); }});
 </script>
 </body>
 </html>"""
