@@ -1,70 +1,19 @@
 from helpers.logger import print_error, print_info
-from pages.inheriting_pages.book_page import BookPage
-from pages.inheriting_pages.home_page import HomePage
+from methods.orchestrator import orchestrator
+from methods.search_books_by_title_under_year import search_books_by_title_under_year
+from methods.add_books_to_reading_list import add_books_to_reading_list
+from methods.assert_reading_list_count import assert_reading_list_count
 from pages.inheriting_pages.profile_page import ProfilePage
 from helpers.browser import Browser
 
-import random
 import asyncio
-
-
-async def search_books_by_title_under_year(title: str, year: int, limit: int = 5) -> list[str]:
-    home_page = await HomePage.create()
-    search_results_page = await home_page.search_books_by_title_under_year(
-        title, year)
-    return await search_results_page.get_books_urls(limit)
-
-
-async def add_books_to_reading_list(urls: list[str]):
-    want_to_read = already_read = 0
-    if not urls:
-        return want_to_read, already_read
-
-    book_page = await BookPage.create(urls[0])
-    for index, url in enumerate(urls):
-        if index > 0:
-            book_page.book_url = url
-            await book_page.navigate()
-
-        if random.choice([True, False]):
-            res = await book_page.set_book_as_want_to_read()
-            want_to_read += 1
-            if res == -1:
-                print_info(f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
-                already_read -= 1
-        else:
-            res = await book_page.set_book_as_already_read()
-            already_read += 1
-            if res == -1:
-                print_info(f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
-                want_to_read -= 1
-
-    return want_to_read, already_read
-
-
-async def assert_reading_list_count(expected_want_to_read: int, expected_already_read: int):
-    profile_page = await ProfilePage.create()
-    actual_want_to_read = await profile_page.get_want_to_read_quantity()
-    actual_already_read = await profile_page.get_already_read_quantity()
-
-    assert actual_want_to_read == expected_want_to_read and actual_already_read == expected_already_read, f"Expected {expected_want_to_read} books in 'Want to Read' and {expected_already_read} books in 'Already Read', but found {actual_want_to_read} and {actual_already_read}."
-    print_info(
-        f"Assertion passed: {actual_want_to_read} books in 'Want to Read' and {actual_already_read} books in 'Already Read' as expected.")
 
 
 async def main():
     browser = Browser.get_instance()
 
     try:
-        urls = await search_books_by_title_under_year("harry potter", 2026, limit=20)
-        print_info(f"Found {len(urls)} books matching criteria")
-        unique_urls = list(url.split('/')[4]
-                           for url in urls if url is not None)
-        print_info(f"Unique book identifiers: {len(set(unique_urls))}")
-        profile_page = await ProfilePage.create()
-        # await profile_page.remove_all_books_from_shelves()
-        want_to_read, already_read = await add_books_to_reading_list(urls)
-        await assert_reading_list_count(want_to_read, already_read)
+        await orchestrator()
     except Exception as e:
         print_error(f"An error occurred: {e}")
 
