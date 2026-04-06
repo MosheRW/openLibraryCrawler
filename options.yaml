@@ -8,17 +8,18 @@ queries:
     limit: 10
   - query: "data science"
     max_year: 2024
-    limit: 10
+    limit: 15
   - query: "romance novels"
     max_year: 2024
-    limit: 10
+    limit: 12
   - query: "history books"
     max_year: 2024
-    limit: 10
+    limit: 18
 settings:
-  headless: false
+  headless: true
   output_format: "json"
   output_directory: "results"
+  initialize_book_shelves: true
   print_info: true
   save_results: true
   log_level: "INFO"
