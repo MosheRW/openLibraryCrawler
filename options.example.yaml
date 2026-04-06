@@ -19,6 +19,7 @@ settings:
   headless: true
   output_format: "json"
   output_directory: "results"
+  initialize_book_shelves: true
   print_info: true
   save_results: true
   log_level: "INFO"

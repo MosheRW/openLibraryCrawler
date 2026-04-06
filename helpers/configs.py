@@ -28,10 +28,11 @@ class Account:
 
 class Settings:
     def __init__(self, headless: bool = True, output_format: str = "json", output_directory: str = "results",
-                 print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log"):
+                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log"):
         self._headless = headless
         self._output_format = output_format
         self._output_directory = output_directory
+        self._initialize_book_shelves = initialize_book_shelves
         self._print_info = print_info
         self._print_errors = print_errors
         self._save_results = save_results
@@ -61,6 +62,10 @@ class Settings:
     @property
     def save_results(self) -> bool:
         return self._save_results
+
+    @property
+    def initialize_book_shelves(self) -> bool:
+        return self._initialize_book_shelves
 
     @property
     def log_level(self) -> str:
