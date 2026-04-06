@@ -16,7 +16,7 @@ queries:
     max_year: 2024
     limit: 10
 settings:
-  headless: true
+  headless: false
   output_format: "json"
   output_directory: "results"
   print_info: true
