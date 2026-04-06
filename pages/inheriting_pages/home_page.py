@@ -1,5 +1,6 @@
 from playwright.async_api import Page
 from helpers.browser import Browser
+from helpers.results import title_to_filename
 from pages.inheriting_pages.base_page import BasePage
 from pages.inheriting_pages.search_results_page import SearchResultsPage
 
@@ -35,9 +36,9 @@ class HomePage(BasePage):
         await self.page.fill("input[name='q']", query)
         await self.page.wait_for_selector("input.search-bar-submit[type='submit']")
         await self.page.click("input.search-bar-submit[type='submit']")
-        await self.take_screenshot("search_results")
+        await self.take_screenshot(f"search_results_page_{1}", title_to_filename(query))
 
-        return SearchResultsPage(self.page)
+        return SearchResultsPage(self.page, query)
 
     async def search_books_by_title_under_year(self, query: str, year: int) -> SearchResultsPage:
         return await self._search_books(title=query, year=year)
