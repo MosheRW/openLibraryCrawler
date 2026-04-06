@@ -1,12 +1,12 @@
-printInfo = True
-printError = True
+from .configs import Config
+config = Config()
 
 
 def print_info(message):
-    if printInfo:
+    if config.settings.print_info:
         print(f"\033[94m[INFO]\033[0m {message}")
 
 
 def print_error(message):
-    if printError:
+    if config.settings.print_errors:
         print(f"\033[91m[ERROR]\033[0m {message}")
