@@ -31,9 +31,10 @@ class HomePage(BasePage):
     async def _search_books(self, title: str | None = None, author: str | None = None, year: int | None = None, limit: int = 5) -> SearchResultsPage:
         query = self._build_query(title, author, year)
         await self.navigate()
-        await self.page.wait_for_selector("input[name='q']", timeout=5000)
+        await self.page.wait_for_selector("input[name='q']")
         await self.page.fill("input[name='q']", query)
-        await self.page.click("input.search-bar-submit[type='submit']", timeout=5000)
+        await self.page.wait_for_selector("input.search-bar-submit[type='submit']")
+        await self.page.click("input.search-bar-submit[type='submit']")
         await self.take_screenshot("search_results")
 
         return SearchResultsPage(self.page)
