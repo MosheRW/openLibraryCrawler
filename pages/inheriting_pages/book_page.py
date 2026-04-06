@@ -1,4 +1,8 @@
+# import asyncio
+
 from playwright.async_api import Page
+from helpers.logger import Log
+from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
@@ -14,6 +18,12 @@ class BookPage(BasePage):
     def __init__(self, page: Page, book_url: str):
         super().__init__(page)
         self.book_url = book_url
+        # asyncio.create_task(self._log())
+
+    async def _log(self):
+        des = await measure_page_performance(self.page, self.page.url, 2500)
+        self.logger.add_log(Log(url=self.book_url, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
 
     @classmethod
     async def create(cls, book_url: str, page: Page | None = None) -> "BookPage":
@@ -27,6 +37,7 @@ class BookPage(BasePage):
     async def navigate(self) -> None:
         await self.page.goto(self.book_url)
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
+        await self._log()
 
     async def click_master_reading_button(self, title: str) -> bool | str:
         await self.page.wait_for_selector(book_page_selector["master button"])

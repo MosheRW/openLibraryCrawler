@@ -1,5 +1,9 @@
+import asyncio
+
 from playwright.async_api import Page
-from helpers.logger import print_info
+from helpers.logger import Log
+from helpers.results import title_to_filename
+from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from utils.book import Book
 
@@ -14,11 +18,20 @@ searchResultsPageSelector = {
 
 
 class SearchResultsPage(BasePage):
-    def __init__(self, page: Page):
+    def __init__(self, page: Page, query: str = ""):
         super().__init__(page)
+        self.current_page = 1
+        self.query = query
+        # asyncio.create_task(self._log())
+
+    async def _log(self):
+        des = await measure_page_performance(self.page, self.page.url, 3000)
+        self.logger.add_log(Log(url=self.page.url, page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
 
     async def navigate(self) -> None:
         await self.page.goto("https://openlibrary.org/")
+        await self._log()
 
     async def get_books(self, limit: int = 5, prev_books: list[Book] | None = None) -> list[Book]:
         await self.page.wait_for_selector(
@@ -71,5 +84,6 @@ class SearchResultsPage(BasePage):
 
         if next_button:
             await next_button.click()
-            await self.page.wait_for_load_state("networkidle")
-            await self.take_screenshot("next_page")
+            await self.page.wait_for_load_state("load")
+            self.current_page += 1
+            await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
