@@ -130,3 +130,9 @@ class Config:
     @property
     def settings(self) -> Settings:
         return self._settings
+
+    def __str__(self) -> str:
+        return f"Account: {self.account}\nQueries: {self.queries}\nSettings: {self.settings}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
