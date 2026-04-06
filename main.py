@@ -27,11 +27,17 @@ async def add_books_to_reading_list(urls: list[str]):
             await book_page.navigate()
 
         if random.choice([True, False]):
-            await book_page.set_book_as_want_to_read()
+            res = await book_page.set_book_as_want_to_read()
             want_to_read += 1
+            if res == -1:
+                print_info(f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
+                already_read -= 1
         else:
-            await book_page.set_book_as_already_read()
+            res = await book_page.set_book_as_already_read()
             already_read += 1
+            if res == -1:
+                print_info(f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
+                want_to_read -= 1
 
     return want_to_read, already_read
 
@@ -50,13 +56,13 @@ async def main():
     browser = Browser.get_instance()
 
     try:
-        urls = await search_books_by_title_under_year("harry potter", 2026, limit=40)
+        urls = await search_books_by_title_under_year("harry potter", 2026, limit=20)
         print_info(f"Found {len(urls)} books matching criteria")
         unique_urls = list(url.split('/')[4]
                            for url in urls if url is not None)
         print_info(f"Unique book identifiers: {len(set(unique_urls))}")
         profile_page = await ProfilePage.create()
-        await profile_page.remove_all_books_from_shelves()
+        # await profile_page.remove_all_books_from_shelves()
         want_to_read, already_read = await add_books_to_reading_list(urls)
         await assert_reading_list_count(want_to_read, already_read)
     except Exception as e:
