@@ -1,5 +1,6 @@
 from playwright.async_api import Page
-from helpers.logger import print_error, print_info
+from helpers.logger import Log, print_error, print_info
+from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
@@ -24,6 +25,9 @@ class ProfilePage(BasePage):
 
     async def navigate(self, username: str) -> None:
         await self.page.goto(f"https://openlibrary.org/people/{username}/books")
+        des = await measure_page_performance(self.page, self.page.url, 2000)
+        self.logger.add_log(Log(url=self.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
 
     async def _get_quantity(self, selector: str) -> int:
         await self.page.reload()
