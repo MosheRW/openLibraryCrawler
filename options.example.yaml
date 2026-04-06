@@ -1,0 +1,25 @@
+account:
+  email: "REDACTED_EMAIL"
+  username: "REDACTED_USERNAME"
+  password: "REDACTED_PASSWORD"
+queries:
+  - query: "python programming"
+    max_year: 2024
+    limit: 10
+  - query: "data science"
+    max_year: 2024
+    limit: 10
+  - query: "romance novels"
+    max_year: 2024
+    limit: 10
+  - query: "history books"
+    max_year: 2024
+    limit: 10
+settings:
+  headless: true
+  output_format: "json"
+  output_directory: "results"
+  print_info: true
+  save_results: true
+  log_level: "INFO"
+  log_file: "app.log"
