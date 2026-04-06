@@ -2,6 +2,7 @@
 
 from playwright.async_api import Page
 from helpers.logger import Log
+from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
@@ -24,6 +25,7 @@ class BookPage(BasePage):
         des = await measure_page_performance(self.page, self.page.url, 2500)
         self.logger.add_log(Log(url=self.book_url, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+        
 
     @classmethod
     async def create(cls, book_url: str, page: Page | None = None) -> "BookPage":
@@ -81,12 +83,17 @@ class BookPage(BasePage):
                 return True
         return False
 
-    async def set_book_as_want_to_read(self) -> int:
-        result = await self.click_master_reading_button("Want to Read")
+    async def is_book_marked_as(self, title: str) -> int:
+        result = await self.click_master_reading_button(title)
         if result is not True:
-            res = await self.click_a_reading_button("Want to Read")
+            res = await self.click_a_reading_button(title)
             if res:
                 result = True
+
+        await self._log()
+        title = await self.page.title()
+        await self.page.wait_for_timeout(1000)
+        await self.take_screenshot(title_to_filename(title))
 
         if result == False:
             return 0
@@ -94,30 +101,13 @@ class BookPage(BasePage):
             return 1
         else:
             return -1
+        
+
+    async def set_book_as_want_to_read(self) -> int:
+        return await self.is_book_marked_as("Want to Read")
 
     async def set_book_as_already_read(self) -> int:
-        result = await self.click_master_reading_button("Already Read")
-        if result is not True:
-            res = await self.click_a_reading_button("Already Read")
-            if res:
-                result = True
-        if result == False:
-            return 0
-        elif result is True:
-            return 1
-        else:
-            return -1
+        return await self.is_book_marked_as("Already Read")
 
     async def set_book_as_currently_reading(self) -> int:
-        result = await self.click_master_reading_button("Currently Reading")
-        if result is not True:
-            res = await self.click_a_reading_button("Currently Reading")
-            if res:
-                result = True
-
-        if result == False:
-            return 0
-        elif result is True:
-            return 1
-        else:
-            return -1
+        return await self.is_book_marked_as("Currently Reading")
