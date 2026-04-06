@@ -1,4 +1,5 @@
 from playwright.async_api import Page
+from helpers.logger import print_error, print_info
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
@@ -25,17 +26,19 @@ class ProfilePage(BasePage):
         await self.page.goto(f"https://openlibrary.org/people/{username}/books")
 
     async def _get_quantity(self, selector: str) -> int:
+        await self.page.reload()
+        await self.page.wait_for_selector(profile_page_selector[selector])
         element = await self.page.query_selector(profile_page_selector[selector])
 
         if element is None:
-            print(f"Element for selector '{selector}' not found.")
+            print_error(f"Element for selector '{selector}' not found.")
             return 0
 
         quantity_text = (await element.inner_text()).strip()
         try:
             return int(quantity_text)
         except ValueError:
-            print(f"Could not convert '{quantity_text}' to an integer.")
+            print_error(f"Could not convert '{quantity_text}' to an integer.")
             return 0
 
     async def get_want_to_read_quantity(self) -> int:
@@ -47,4 +50,48 @@ class ProfilePage(BasePage):
     async def get_already_read_quantity(self) -> int:
         return await self._get_quantity("already read count")
 
-    async def get_
+    async def get_want_and_already_read_quantities(self) -> tuple[int, int]:
+        # await self.page.reload()
+        want_to_read = await self.get_want_to_read_quantity()
+        already_read = await self.get_already_read_quantity()
+        return want_to_read, already_read
+
+    async def navigate_to_want_to_read_shelf(self) -> None:
+        await self.page.wait_for_selector(profile_page_selector["want to read count"])
+        await self.page.click(profile_page_selector["want to read count"])
+
+    async def navigate_to_already_read_shelf(self) -> None:
+        await self.page.wait_for_selector(profile_page_selector["already read count"])
+        await self.page.click(profile_page_selector["already read count"])
+
+    async def _clear_shelf(self, shelf_name: str, shelf_click_selector: str) -> None:
+        await self.page.click(shelf_click_selector)
+        counter = 0
+
+        while True:
+            button = await self.page.query_selector("form.reading-log.primary-action")
+
+            if button is None:
+                break
+            else:
+                current_url = self.page.url
+                await button.click()
+
+                if self.page.url == current_url:
+                    await self.page.wait_for_timeout(200)
+                else:
+                    await self.page.go_back()
+
+                if counter == 5:
+                    await self.page.reload()
+                    counter = 0
+                counter += 1
+
+    async def remove_all_books_from_shelves(self) -> None:
+        print_info("Clearing 'Want to Read' shelf...")
+        while await self.get_want_to_read_quantity() > 0:
+            await self._clear_shelf("Want to Read", profile_page_selector["want to read count"])
+
+        print_info("Clearing 'Already Read' shelf...")
+        while await self.get_already_read_quantity() > 0:
+            await self._clear_shelf("Already Read", profile_page_selector["already read count"])
