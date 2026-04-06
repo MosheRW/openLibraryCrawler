@@ -1,4 +1,5 @@
 from playwright.async_api import Page
+from helpers.logger import print_info
 from pages.inheriting_pages.base_page import BasePage
 from utils.book import Book
 
@@ -46,7 +47,7 @@ class SearchResultsPage(BasePage):
             year_text = (await year_element.inner_text()).strip().rsplit(
                 " ", 1)[-1] if year_element else "Unknown Year"
             year = int(year_text) if year_text.isdigit() else 0
-            url = f"https://openlibrary.org{url_element}" if url_element else None
+            url = f"https://openlibrary.org/{url_element.split('/')[1]}/{url_element.split('/')[2]}" if url_element else None
 
             books.append(Book(title, author, year, url))
 
@@ -61,7 +62,8 @@ class SearchResultsPage(BasePage):
 
     async def get_books_urls(self, limit: int = 5) -> list[str]:
         books = await self.get_books(limit)
-        return [book.url for book in books if book.url is not None]
+        books_set = set([book.url for book in books if book.url is not None])
+        return list(books_set)
 
     async def go_to_next_page(self) -> None:
         next_button = await self.page.query_selector(
