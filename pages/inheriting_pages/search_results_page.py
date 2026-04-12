@@ -42,7 +42,10 @@ class SearchResultsPage(BasePage):
         current_limit = limit - len(prev_books) if prev_books else limit
         books: list[Book] = []
 
-        for element in book_elements[:current_limit]:
+        for element in book_elements:
+            if len(books) >= current_limit:
+                break
+            
             title_element = await element.query_selector(
                 searchResultsPageSelector["title"])
             author_element = await element.query_selector(
@@ -59,6 +62,10 @@ class SearchResultsPage(BasePage):
 
             year_text = (await year_element.inner_text()).strip().rsplit(
                 " ", 1)[-1] if year_element else "Unknown Year"
+
+            if year_text.lower() == "unknown year":
+                continue
+
             year = int(year_text) if year_text.isdigit() else 0
             url = f"https://openlibrary.org/{url_element.split('/')[1]}/{url_element.split('/')[2]}" if url_element else None
 
