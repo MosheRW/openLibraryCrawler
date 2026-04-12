@@ -16,7 +16,7 @@ queries:
     max_year: 2024
     limit: 18
 settings:
-  headless: true
+  headless: false
   output_format: "json"
   output_directory: "results"
   initialize_book_shelves: true
