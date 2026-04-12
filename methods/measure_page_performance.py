@@ -12,12 +12,16 @@ async def measure_page_performance(page: Page, url: str, threshold: int) -> dict
 
             if (navigationEntry) {
                 return {
+                    // first_paint_ms is 0 when the entry is unavailable (e.g. served from cache).
+                    // A value of 0 will appear as "fastest possible" in reports rather than "missing".
                     first_paint_ms: firstPaintEntry ? Math.round(firstPaintEntry.startTime) : 0,
                     dom_content_loaded_ms: Math.round(navigationEntry.domContentLoadedEventEnd),
                     load_time_ms: Math.round(navigationEntry.loadEventEnd),
                 };
             }
 
+            // Fallback to the legacy performance.timing API for environments where
+            // PerformanceNavigationTiming is unavailable (older browser contexts).
             const timing = performance.timing;
             const navigationStart = timing.navigationStart;
 
@@ -35,5 +39,6 @@ async def measure_page_performance(page: Page, url: str, threshold: int) -> dict
         "first_paint_ms": metrics["first_paint_ms"],
         "dom_content_loaded_ms": metrics["dom_content_loaded_ms"],
         "load_time_ms": metrics["load_time_ms"],
+        # A load_time_ms of 0 (metric unavailable) will always pass this check.
         "is_within_threshold": metrics["load_time_ms"] <= threshold,
     }

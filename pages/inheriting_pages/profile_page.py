@@ -6,6 +6,9 @@ from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
+# OpenLibrary's reading-list UI goes stale after several successive book removals:
+# the "remove" button stops responding. Reloading every N iterations resets the DOM.
+# The value 5 was found empirically as the point where the UI typically stalls.
 ITERATIONS_BEFORE_RELOAD = 5
 
 profile_page_selector = {
@@ -46,6 +49,9 @@ class ProfilePage(BasePage):
         If any step fails (element not found or conversion error), it logs an error and returns 0.
         """
 
+        # Reload is required because OpenLibrary updates sidebar counts asynchronously.
+        # Note: get_want_and_already_read_quantities calls this method twice,
+        # resulting in two full page reloads per assertion.
         await self.page.reload()
         await self.page.wait_for_selector(profile_page_selector[selector])
         element = await self.page.query_selector(profile_page_selector[selector])

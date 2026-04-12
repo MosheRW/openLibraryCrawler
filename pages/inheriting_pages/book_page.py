@@ -86,7 +86,7 @@ class BookPage(BasePage):
             "if the master button is active and its title does not match the provided title, we return not success:"
             return ReadingStatus.NOT_SUCCESS
 
-        return ReadingStatus.FAILURE
+        return ReadingStatus.FAILURE  # unreachable: the two conditions above are exhaustive
 
     async def invert_reading_buttons(self) -> None:
         arrow_element = await self.page.query_selector(
@@ -115,6 +115,8 @@ class BookPage(BasePage):
 
         await self._log()
         title = await self.page.title()
+        # Brief wait for the shelf button animation to settle before taking the
+        # screenshot, so the captured state reflects the confirmed shelf status.
         await self.page.wait_for_timeout(1000)
         await self.take_screenshot(title_to_filename(title))
 

@@ -17,6 +17,9 @@ class HomePage(BasePage):
 
     @classmethod
     async def create(cls, page: Page | None = None) -> "HomePage":
+        # The `page` parameter is not used — the singleton Browser always provides
+        # the shared page instance. The parameter is kept for signature consistency
+        # with other page factories.
         instance = cls(await Browser.get_instance().get_page())
         await instance.navigate()
         await instance.initialize()
@@ -42,6 +45,8 @@ class HomePage(BasePage):
         await self.page.fill(home_page_selectors["input_search"], query)
         await self.page.wait_for_selector(home_page_selectors["search_button"])
         await self.page.click(home_page_selectors["search_button"])
+        # Page number is always 1 here — this is the initial search results page.
+        # Subsequent pages are captured by SearchResultsPage.go_to_next_page().
         await self.take_screenshot(f"search_results_page_{1}", title_to_filename(f"{title}_{author}_{year}"))
 
         return SearchResultsPage(self.page, query)
@@ -49,5 +54,6 @@ class HomePage(BasePage):
     async def search_books_by_title_under_year(self, query: str, year: int) -> SearchResultsPage:
         return await self._search_books(title=query, year=year)
 
+    # Implemented for potential future use; currently not called by the orchestrator.
     async def search_books_by_author_under_year(self, query: str, year: int) -> SearchResultsPage:
         return await self._search_books(author=query, year=year)

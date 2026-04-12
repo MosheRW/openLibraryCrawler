@@ -13,6 +13,9 @@ async def main():
     try:
         await orchestrator()
     except Exception as e:
+        # The finally block below always runs cleanup, so the exception is
+        # caught here to allow save_logs() and generate_report() to complete
+        # even on a failed run. A partial report is better than no report.
         print_error(f"An error occurred: {e}")
 
     finally:
