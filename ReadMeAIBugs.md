@@ -3,7 +3,7 @@
    ```python
    def __init__(self, page):
        super().__init__(page)
-       self.page = page
+       self.page = עכ
        self.search_input = "input[name='q']"
        self.search_button = "button[type='submit']"
        self.results = ".searchResultItem"
