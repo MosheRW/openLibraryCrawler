@@ -39,6 +39,13 @@ class ProfilePage(BasePage):
                             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
 
     async def _get_quantity(self, selector: str) -> int:
+        """
+        Retrieves the quantity of books for a given shelf by its selector.
+        It first reloads the page to ensure the data is up-to-date, then waits for the element corresponding to the selector to be available.
+        If the element is found, it extracts the inner text, trims it, and attempts to convert it to an integer.
+        If any step fails (element not found or conversion error), it logs an error and returns 0.
+        """
+
         await self.page.reload()
         await self.page.wait_for_selector(profile_page_selector[selector])
         element = await self.page.query_selector(profile_page_selector[selector])
