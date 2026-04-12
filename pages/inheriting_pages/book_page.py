@@ -1,4 +1,4 @@
-# import asyncio
+from enum import Enum
 
 from playwright.async_api import Page
 from helpers.logger import Log
@@ -15,17 +15,21 @@ book_page_selector = {
 }
 
 
+class ReadingStatus(Enum):
+    NOT_SUCCESS = -1
+    FAILURE = 0
+    SUCCESS = 1
+
+
 class BookPage(BasePage):
     def __init__(self, page: Page, book_url: str):
         super().__init__(page)
         self.book_url = book_url
-        # asyncio.create_task(self._log())
 
     async def _log(self):
         des = await measure_page_performance(self.page, self.page.url, 2500)
         self.logger.add_log(Log(url=self.book_url, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
-        
 
     @classmethod
     async def create(cls, book_url: str, page: Page | None = None) -> "BookPage":
@@ -41,29 +45,48 @@ class BookPage(BasePage):
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
         await self._log()
 
-    async def click_master_reading_button(self, title: str) -> bool | str:
+    async def click_master_reading_button(self, title: str) -> ReadingStatus:
+        """
+        First, we check if the master button is active. If it is, we compare its title with the provided title.
+        If they match, we return True.
+        If they don't match, we return the actual title of the active button, which indicates that the book is marked as a different status.
+        If the master button is not active, we look for the inactive master button.
+        If we find it and its title matches the provided title, we click it to mark the book with the desired status and return True.
+        If we don't find any master button or if the titles don't match, we return False, indicating that the book is not marked with the desired status and we couldn't change it using the master button.
+        """
         await self.page.wait_for_selector(book_page_selector["master button"])
+
         master_element = await self.page.query_selector(
             book_page_selector["master button active"])
+
+        "if the master button is inactive:"
         if master_element is None:
             master_element = await self.page.query_selector(
                 book_page_selector["master button"])
 
+            "if there is no master button, we return failure:"
             if master_element is None:
-                return False
+                return ReadingStatus.FAILURE
 
+            "if the master button is inactive and its title matches the provided title, we click it and return success:"
             if (await master_element.inner_text()).strip().lower() == title.lower():
                 await master_element.click()
-                return True
-            return False
+                return ReadingStatus.SUCCESS
 
+            "if the master button is inactive and its title does not match the provided title, we return not success:"
+            return ReadingStatus.NOT_SUCCESS
+
+        "if the master button is active, we compare its title with the provided title:"
         element_title = (await master_element.inner_text()).strip().lower()
-        if element_title == title.lower():
-            return True
-        elif element_title != title.lower():
-            return element_title
 
-        return False
+        "if the master button is active and its title matches the provided title, we return success:"
+        if element_title == title.lower():
+            return ReadingStatus.SUCCESS
+        elif element_title != title.lower():
+            "if the master button is active and its title does not match the provided title, we return not success:"
+            return ReadingStatus.NOT_SUCCESS
+
+        return ReadingStatus.FAILURE
 
     async def invert_reading_buttons(self) -> None:
         arrow_element = await self.page.query_selector(
@@ -71,7 +94,7 @@ class BookPage(BasePage):
         if arrow_element is not None:
             await arrow_element.click()
 
-    async def click_a_reading_button(self, title: str) -> bool:
+    async def click_a_reading_button(self, title: str) -> ReadingStatus:
         button_elements = await self.page.query_selector_all(
             book_page_selector["buttons elements"])
 
@@ -80,28 +103,27 @@ class BookPage(BasePage):
                 if not await button.is_visible():
                     await self.invert_reading_buttons()
                 await button.click()
-                return True
-        return False
+                return ReadingStatus.SUCCESS
+        return ReadingStatus.FAILURE
 
     async def is_book_marked_as(self, title: str) -> int:
         result = await self.click_master_reading_button(title)
-        if result is not True:
+        if result is not ReadingStatus.SUCCESS:
             res = await self.click_a_reading_button(title)
-            if res:
-                result = True
+            if res == ReadingStatus.SUCCESS:
+                result = ReadingStatus.SUCCESS
 
         await self._log()
         title = await self.page.title()
         await self.page.wait_for_timeout(1000)
         await self.take_screenshot(title_to_filename(title))
 
-        if result == False:
+        if result == ReadingStatus.FAILURE:
             return 0
-        elif result is True:
+        elif result == ReadingStatus.SUCCESS:
             return 1
         else:
             return -1
-        
 
     async def set_book_as_want_to_read(self) -> int:
         return await self.is_book_marked_as("Want to Read")
