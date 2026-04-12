@@ -1,4 +1,5 @@
 from playwright.async_api import Page
+from helpers.configs import Config
 from helpers.logger import Log, print_error, print_info
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
@@ -9,6 +10,7 @@ profile_page_selector = {
     "want to read count": "a[data-ol-link-track='MyBooksSidebar|WantToRead'] > span.li-count",
     "currently reading count": "a[data-ol-link-track='MyBooksSidebar|CurrentlyReading'] > span.li-count",
     "already read count": "a[data-ol-link-track='MyBooksSidebar|AlreadyRead'] > span.li-count",
+    "clear shelf": "form.reading-log.primary-action",
 
 }
 
@@ -20,7 +22,8 @@ class ProfilePage(BasePage):
     @classmethod
     async def create(cls) -> "ProfilePage":
         instance = cls(await Browser.get_instance().get_page())
-        await instance.navigate("m0526750830")
+        config = Config()
+        await instance.navigate(config.account.username)
         await instance.initialize()
         des = await measure_page_performance(instance.page, instance.page.url, 2000)
         instance.logger.add_log(Log(url=instance.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
@@ -59,12 +62,11 @@ class ProfilePage(BasePage):
         return await self._get_quantity("already read count")
 
     async def get_want_and_already_read_quantities(self, title: str | None = None) -> tuple[int, int]:
-        # await self.take_screenshot(query="profile_page_quantities" if title is None else f"profile_page_quantities_{title_to_filename(title)}")
         if title is not None:
             await self.take_screenshot(name=title_to_filename(title), query="profile_page_quantities")
         else:
             await self.take_screenshot(name="profile_page_quantities")
-        # await self.page.reload()
+
         want_to_read = await self.get_want_to_read_quantity()
         already_read = await self.get_already_read_quantity()
         return want_to_read, already_read
@@ -77,12 +79,16 @@ class ProfilePage(BasePage):
         await self.page.wait_for_selector(profile_page_selector["already read count"])
         await self.page.click(profile_page_selector["already read count"])
 
-    async def _clear_shelf(self, shelf_name: str, shelf_click_selector: str) -> None:
+    async def _clear_shelf(self, shelf_click_selector: str) -> None:
+        """
+        Clears a shelf by repeatedly deactivating the first book until the shelf is empty. It handles potential issues with page updates by checking if the URL changes after each click and waiting if it doesn't. It also reloads the page after every 5 attempts to ensure the DOM is updated.
+        """
+
         await self.page.click(shelf_click_selector)
         counter = 0
 
         while True:
-            button = await self.page.query_selector("form.reading-log.primary-action")
+            button = await self.page.query_selector(profile_page_selector["clear shelf"])
 
             if button is None:
                 break
@@ -103,8 +109,8 @@ class ProfilePage(BasePage):
     async def remove_all_books_from_shelves(self) -> None:
         print_info("Clearing 'Want to Read' shelf...")
         while await self.get_want_to_read_quantity() > 0:
-            await self._clear_shelf("Want to Read", profile_page_selector["want to read count"])
+            await self._clear_shelf(profile_page_selector["want to read count"])
 
         print_info("Clearing 'Already Read' shelf...")
         while await self.get_already_read_quantity() > 0:
-            await self._clear_shelf("Already Read", profile_page_selector["already read count"])
+            await self._clear_shelf(profile_page_selector["already read count"])
