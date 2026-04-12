@@ -46,6 +46,10 @@ class Log:
         return self._page
 
     @property
+    def url(self):
+        return self._url
+
+    @property
     def first_paint_ms(self):
         return self._first_paint_ms
 
@@ -68,6 +72,8 @@ class Logger:
     _initialized = False
 
     _results: Results
+    # Class-level list shared across all Logger instances. Safe here because
+    # Logger is a singleton — there is always exactly one instance in a run.
     _logs: list[Log] = []
 
     def __new__(cls):
@@ -103,7 +109,7 @@ class Logger:
         logs_data = [
             {
                 "page": log.page,
-                "url": log._url,
+                "url": log.url,
                 "first_paint_ms": log.first_paint_ms,
                 "dom_content_loaded_ms": log.dom_content_loaded_ms,
                 "load_time_ms": log.load_time_ms,
