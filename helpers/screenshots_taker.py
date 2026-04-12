@@ -3,6 +3,7 @@ from playwright.async_api import Page
 
 from pathlib import Path
 
+from helpers.logger import print_info
 from helpers.results import Results, title_to_filename
 
 
@@ -25,6 +26,8 @@ class ScreenshotsTaker:
             return
         self._initialized = True
 
+    # Directory creation is handled automatically by Playwright's screenshot() call.
+    # This method is kept for cases where explicit directory setup is needed before a run.
     def _create_screenshots_path(self, prename=None) -> Path:
         path = Path("results", prename or self._prename, "screenshots")
         path.mkdir(parents=True, exist_ok=True)
@@ -38,4 +41,4 @@ class ScreenshotsTaker:
             path = self._results.screenshots_path / \
                 f"{title_to_filename(name)}.png"
         await page.screenshot(path=path, full_page=True, type="png")
-        print(f"Screenshot saved to: {path}")
+        print_info(f"Screenshot saved to: {path}")
