@@ -1,4 +1,5 @@
 from playwright.async_api import Page
+from helpers.configs import Config
 from helpers.logger import Logger
 from helpers.screenshots_taker import ScreenshotsTaker
 from pages.auth_page import AuthPage
