@@ -111,12 +111,19 @@ class Config:
     def __init__(self):
         if self._initialized:
             return
-        with open("options.yaml", "r") as f:
-            config_data = yaml.safe_load(f)
-            self._account = Account(**config_data["account"])
-            self._queries = [Query(**query)
-                             for query in config_data["queries"]]
-            self._settings = Settings(**config_data["settings"])
+        try:
+            with open("options.yaml", "r") as f:
+                config_data = yaml.safe_load(f)
+                self._account = Account(**config_data["account"])
+                self._queries = [Query(**query)
+                                 for query in config_data["queries"]]
+                self._settings = Settings(**config_data["settings"])
+        except FileNotFoundError:
+            raise FileNotFoundError("options.yaml file not found.")
+        except KeyError as e:
+            raise KeyError(f"Missing key in options.yaml: {e}")
+        except yaml.YAMLError as e:
+            raise ValueError(f"Error parsing options.yaml: {e}")
         self._initialized = True
 
     @property
