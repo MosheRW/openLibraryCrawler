@@ -20,14 +20,14 @@ async def add_books_to_reading_list(urls: list[str]):
             want_to_read += 1
             if res == -1:
                 print_info(
-                    f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
+                    f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
                 already_read -= 1
         else:
             res = await book_page.set_book_as_already_read()
             already_read += 1
             if res == -1:
                 print_info(
-                    f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
+                    f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
                 want_to_read -= 1
 
     return want_to_read, already_read
