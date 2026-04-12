@@ -29,7 +29,6 @@ class Browser:
     async def get_browser(self) -> PWBrowser:
         if self._browser is None:
             self._playwright = await async_playwright().start()
-            # self._browser = await self._playwright.chromium.launch(headless=False)
             self._browser = await self._playwright.chromium.launch(headless=self._config.settings.headless)
         return self._browser
 

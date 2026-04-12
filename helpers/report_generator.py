@@ -17,6 +17,9 @@ def _screenshot_section(screenshots_dir: Path) -> str:
     if not screenshots_dir.exists():
         return ""
 
+    # glob("*.png") only matches files directly in screenshots_dir.
+    # Book-page screenshots are stored in query-named subdirectories and will
+    # not appear in the gallery. Use "**/*.png" to include subdirectories.
     book_shots = sorted(screenshots_dir.glob("*.png"))
     if not book_shots:
         return ""

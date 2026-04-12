@@ -111,6 +111,9 @@ class Config:
     def __init__(self):
         if self._initialized:
             return
+        # Relative path — assumes the process is launched from the project root.
+        # AuthPage resolves the same file via __file__; both work as long as
+        # the working directory is the project root when running main.py.
         try:
             with open("options.yaml", "r") as f:
                 config_data = yaml.safe_load(f)
