@@ -2,6 +2,8 @@ from playwright.async_api import ElementHandle, Page
 from helpers.configs import Config
 
 auth_page_selector = {
+    # OpenLibrary reuses the same form element for both login and registration;
+    # the id is 'register' even when the form is in login mode.
     "container": "form[id='register'].login.olform",
     "login_buttons": "a.btn",
     "email_input": "input[name='username']",
@@ -60,6 +62,8 @@ class AuthPage:
         await self._log_in_element.click()
 
     async def _log_in(self, username: str, password: str) -> None:
+        # OpenLibrary's login form accepts the email address in the field
+        # named 'username'. The caller passes email as the first argument.
         await self._await_page_load()
 
         form = await self.page.query_selector(auth_page_selector["container"])
@@ -81,7 +85,9 @@ class AuthPage:
             raise ValueError("Submit button not found in the login form.")
 
         await submit_button.click()
-        # Wait for potential redirects and page load
+        # OpenLibrary doesn't expose a reliable post-login DOM signal (no unique
+        # element appears, no predictable URL pattern). A fixed timeout allows the
+        # session cookie to be set and the page to settle before checking login state.
         await self.page.wait_for_timeout(5000)
         if not await self._is_logged_in():
             raise ValueError("Login failed. Please check your credentials.")

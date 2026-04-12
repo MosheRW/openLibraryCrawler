@@ -7,6 +7,8 @@ from methods.assert_reading_list_count import assert_reading_list_count
 from methods.search_books_by_title_under_year import search_books_by_title_under_year
 from pages.inheriting_pages.profile_page import ProfilePage
 
+# Instantiated here to warm up the singleton before page objects use it,
+# ensuring the same Results directory is referenced throughout the run.
 screenshotsTaker = ScreenshotsTaker()
 
 
@@ -22,6 +24,8 @@ async def orchestrator():
         await profile_page.get_want_and_already_read_quantities("before_initial")
         await profile_page.remove_all_books_from_shelves()
 
+    # Counts accumulate across all queries: assert_reading_list_count checks the
+    # total shelf state after each query, not just the books added by that query.
     want_to_read_prev, already_read_prev = await profile_page.get_want_and_already_read_quantities("initial")
 
     for query in config.queries:

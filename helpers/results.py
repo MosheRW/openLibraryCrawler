@@ -36,6 +36,8 @@ class Results:
     def prename(self) -> str:
         return self._prename
 
+    # Directory creation was moved to Logger.save_logs() and Playwright's screenshot()
+    # (which creates parent directories automatically). This method is kept for reference.
     def _create_results_path(self, prename=None) -> Path:
         path = Path("results")
         path.mkdir(parents=True, exist_ok=True)

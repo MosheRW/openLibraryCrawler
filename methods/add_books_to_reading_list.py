@@ -21,6 +21,8 @@ async def add_books_to_reading_list(urls: list[str]):
             book_page.book_url = url
             await book_page.navigate()
 
+        # Random shelf assignment exercises both "Want to Read" and "Already Read"
+        # code paths in a single run. Runs are intentionally non-reproducible.
         if random.choice([True, False]):
             res = await book_page.set_book_as_want_to_read()
             want_to_read += 1

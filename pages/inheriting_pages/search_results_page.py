@@ -22,7 +22,8 @@ class SearchResultsPage(BasePage):
         super().__init__(page)
         self.current_page = 1
         self.query = query
-        # asyncio.create_task(self._log())
+        # _log() was previously fired as a fire-and-forget task here, but moved to
+        # an explicit await inside navigate() to ensure errors surface immediately.
 
     async def _log(self):
         des = await measure_page_performance(self.page, self.page.url, 3000)
@@ -63,6 +64,9 @@ class SearchResultsPage(BasePage):
             year_text = (await year_element.inner_text()).strip().rsplit(
                 " ", 1)[-1] if year_element else "Unknown Year"
 
+            # Books without a publication year are skipped: a missing year means
+            # the advanced search filter (first_publish_year:[* TO year]) can't be
+            # verified for that entry, so it's safer to exclude it.
             if year_text.lower() == "unknown year":
                 continue
 
@@ -74,6 +78,10 @@ class SearchResultsPage(BasePage):
         if prev_books is not None:
             books = prev_books + books
 
+        # If this page didn't reach the limit, try the next page recursively.
+        # When there is no next page, go_to_next_page() is a no-op and get_books_urls()
+        # deduplicates the result — so fewer books than `limit` may be returned silently
+        # if the search has fewer results than requested.
         if len(books) < limit:
             await self.go_to_next_page()
             return await self.get_books(limit, books)

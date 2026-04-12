@@ -22,12 +22,12 @@ class Book:
 
     @property
     def to_json(self) -> str:
-        import json
+        import json  # Lazy import: keeps top-level imports minimal for a lightweight data class.
         return json.dumps(self.to_dict)
 
     @property
     def to_csv(self) -> str:
-        import csv
+        import csv  # Lazy import: only loaded when the CSV format is actually requested.
         from io import StringIO
         output = StringIO()
         writer = csv.DictWriter(output, fieldnames=self.to_dict.keys())
@@ -37,7 +37,7 @@ class Book:
 
     @property
     def to_xml(self) -> str:
-        from xml.etree.ElementTree import Element, tostring
+        from xml.etree.ElementTree import Element, tostring  # Lazy import: xml module only loaded on demand.
         book_element = Element("book")
         for key, value in self.to_dict.items():
             child = Element(key)
@@ -47,6 +47,8 @@ class Book:
 
     @property
     def to_html(self) -> str:
+        # Note: title and author values are not HTML-escaped. Suitable for internal
+        # tooling; use html.escape() before embedding in a user-facing page.
         return f"<div class='book'><h2>{self.title}</h2><p>Author: {self.author}</p><p>Year: {self.year}</p><p>URL: <a href='{self.url}'>{self.url}</a></p></div>"
 
     @property
@@ -55,7 +57,7 @@ class Book:
 
     @property
     def to_yaml(self) -> str:
-        import yaml
+        import yaml  # Lazy import: pyyaml only loaded when YAML format is requested.
         return yaml.dump(self.to_dict)
 
     @property
@@ -74,5 +76,7 @@ class Book:
     def url(self) -> str | None:
         return self._url
 
+    # set_url allows post-construction URL assignment when the URL is resolved
+    # separately from the other book metadata (e.g. after deduplication).
     def set_url(self, url: str) -> None:
         self._url = url
