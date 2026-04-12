@@ -1,8 +1,5 @@
-import asyncio
-from pathlib import Path
-
 from playwright.async_api import ElementHandle, Page
-import yaml
+from helpers.configs import Config
 
 auth_page_selector = {
     "container": "form[id='register'].login.olform",
@@ -20,37 +17,18 @@ class AuthPage:
 
         self._log_in_element: ElementHandle | None = None
         self.is_logged_in = False
+        self._config = Config()
 
     def _get_credentials(self) -> tuple[str, str, str] | None:
-        options_path = Path(__file__).resolve().parents[1] / "options.yaml"
-
-        with options_path.open("r", encoding="utf-8") as options_file:
-            options = yaml.safe_load(options_file) or {}
-
-        account = options.get("account") or {}
-        email = (account.get("email") or "").strip()
-        username = (account.get("username") or "").strip()
-        password = (account.get("password") or "").strip()
-
-        if not username or not password:
-            return None
-
-        if username in {"your_username", "your_email@example.com"}:
-            return None
-
-        if password == "your_password":
-            return None
-
-        return email, username, password
+        return self._config.account.email, self._config.account.username, self._config.account.password
 
     async def login(self) -> None:
         if not await self._is_logged_in():
             await self._navigate()
             cred = self._get_credentials()
             if cred is None:
-                print(
-                    "No valid credentials found in options.yaml. Please provide your email, username, and password to log in.")
-                return
+                raise ValueError("Credentials not found in the configuration.")
+
             email, username, password = cred
             if email and password:
                 await self._log_in(email, password)
