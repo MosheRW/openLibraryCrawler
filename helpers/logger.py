@@ -112,7 +112,11 @@ class Logger:
             for log in self._logs
         ]
 
-        output_path = self._results.results_path / "performance_report.json"
+        if not self._results.results_path.exists():
+            self._results.results_path.mkdir(parents=True, exist_ok=True)
+
+        output_path = Path(self._results.results_path,
+                           "performance_report.json")
         # output_path = Path("results", self._results.prename,
         #                    "performance_report.json")
         with open(output_path, "w") as f:
