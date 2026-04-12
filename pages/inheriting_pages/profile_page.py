@@ -6,6 +6,8 @@ from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
+ITERATIONS_BEFORE_RELOAD = 5
+
 profile_page_selector = {
     "want to read count": "a[data-ol-link-track='MyBooksSidebar|WantToRead'] > span.li-count",
     "currently reading count": "a[data-ol-link-track='MyBooksSidebar|CurrentlyReading'] > span.li-count",
@@ -81,7 +83,7 @@ class ProfilePage(BasePage):
 
     async def _clear_shelf(self, shelf_click_selector: str) -> None:
         """
-        Clears a shelf by repeatedly deactivating the first book until the shelf is empty. It handles potential issues with page updates by checking if the URL changes after each click and waiting if it doesn't. It also reloads the page after every 5 attempts to ensure the DOM is updated.
+        Clears a shelf by repeatedly deactivating the first book until the shelf is empty. It handles potential issues with page updates by checking if the URL changes after each click and waiting if it doesn't. It also reloads the page after every ITERATIONS_BEFORE_RELOAD attempts to ensure the DOM is updated.
         """
 
         await self.page.click(shelf_click_selector)
@@ -101,7 +103,7 @@ class ProfilePage(BasePage):
                 else:
                     await self.page.go_back()
 
-                if counter == 5:
+                if counter == ITERATIONS_BEFORE_RELOAD:
                     await self.page.reload()
                     counter = 0
                 counter += 1
