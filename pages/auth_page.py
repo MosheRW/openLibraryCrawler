@@ -7,6 +7,9 @@ import yaml
 auth_page_selector = {
     "container": "form[id='register'].login.olform",
     "login_buttons": "a.btn",
+    "email_input": "input[name='username']",
+    "password_input": "input[name='password']",
+    "submit_button": "button[type='submit']",
 
 }
 
@@ -85,8 +88,8 @@ class AuthPage:
         if form is None:
             raise ValueError("Login form not found on the page.")
 
-        email_input = await form.query_selector("input[name='username']")
-        password_input = await form.query_selector("input[name='password']")
+        email_input = await form.query_selector(auth_page_selector["email_input"])
+        password_input = await form.query_selector(auth_page_selector["password_input"])
 
         if email_input is None or password_input is None:
             raise ValueError(
@@ -94,12 +97,13 @@ class AuthPage:
 
         await email_input.fill(username)
         await password_input.fill(password)
-        submit_button = await form.query_selector("button[type='submit']")
+        submit_button = await form.query_selector(auth_page_selector["submit_button"])
 
         if submit_button is None:
             raise ValueError("Submit button not found in the login form.")
 
         await submit_button.click()
-        await asyncio.sleep(5)  # Wait for login to process
+        # Wait for potential redirects and page load
+        await self.page.wait_for_timeout(5000)
         if not await self._is_logged_in():
             raise ValueError("Login failed. Please check your credentials.")
