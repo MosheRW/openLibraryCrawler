@@ -117,7 +117,5 @@ class Logger:
 
         output_path = Path(self._results.results_path,
                            "performance_report.json")
-        # output_path = Path("results", self._results.prename,
-        #                    "performance_report.json")
         with open(output_path, "w") as f:
             json.dump(logs_data, f, indent=2)
