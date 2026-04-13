@@ -27,7 +27,7 @@ class HomePage(BasePage):
         return instance
 
     async def navigate(self, count: int = 0) -> None:
-        await self.page.goto("https://openlibrary.org/")
+        await self._page.goto("https://openlibrary.org/")
         if await self.is_503_error():
             print_error(
                 "503 error detected on home page, retrying navigation...")
@@ -52,14 +52,15 @@ class HomePage(BasePage):
     async def _search_books(self, title: str | None = None, author: str | None = None, year: int | None = None, limit: int = 5) -> SearchResultsPage:
         query = self._build_query(title, author, year)
         await self.navigate()
-        await self.page.wait_for_selector(home_page_selectors["input_search"])
-        await self.page.fill(home_page_selectors["input_search"], query)
-        await self.page.wait_for_selector(home_page_selectors["search_button"])
-        await self.page.click(home_page_selectors["search_button"])
+        await self._page.wait_for_selector(home_page_selectors["input_search"])
+        await self._page.fill(home_page_selectors["input_search"], query)
+        await self._page.wait_for_selector(home_page_selectors["search_button"])
+        await self._page.click(home_page_selectors["search_button"])
+        
         # Page number is always 1 here — this is the initial search results page.
         # Subsequent pages are captured by SearchResultsPage.go_to_next_page().
         await self.take_screenshot(f"search_results_page_{1}", title_to_filename(f"{title}_{author}_{year}"))
-        return await search_results_page_factory(self.page, query)
+        return await search_results_page_factory(self._page, query)
 
     async def search_books_by_title_under_year(self, query: str, year: int) -> SearchResultsPage:
         return await self._search_books(title=query, year=year)
