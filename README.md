@@ -28,7 +28,8 @@ openLibraryCrawler/
 │   ├── configs.py                   # Config data classes (Account, Settings, Query)
 │   ├── logger.py                    # Performance metrics collector & JSON reporter
 │   ├── results.py                   # Timestamped results directory manager
-│   └── screenshots_taker.py         # Screenshot capture handler
+│   ├── screenshots_taker.py         # Screenshot capture handler
+│   └── report_generator.py          # HTML report generator (Chart.js, dark theme)
 │
 ├── pages/                           # Page Object Model layer
 │   ├── auth_page.py                 # Login automation
@@ -65,7 +66,7 @@ openLibraryCrawler/
 ### 1. Install dependencies
 
 ```bash
-pip install playwright pyyaml
+pip install -r requirements.txt
 playwright install chromium
 ```
 
@@ -104,6 +105,8 @@ settings:
 
 > **Note:** `options.yaml` contains plaintext credentials — keep it out of version control. It is already listed in `.gitignore`.
 
+> **`.env` file:** Alternatively, copy `.env.example` to `.env` and fill in your credentials. Values in `.env` override `options.yaml`.
+
 > **CI/CD:** Credentials can be supplied via environment variables instead of (or to override) `options.yaml`: `OL_EMAIL`, `OL_USERNAME`, `OL_PASSWORD`.
 
 ## Usage
@@ -131,6 +134,7 @@ The crawler will authenticate, run all configured queries, and write output to `
 | File | Description |
 |------|-------------|
 | `results/<timestamp>/performance_report.json` | Page load metrics (first paint, DOM ready, load time) per query |
+| `results/<timestamp>/report.html` | Interactive HTML report with charts, screenshot gallery, and sortable metrics table |
 | `results/<timestamp>/screenshots/` | Screenshots captured during search and book interactions |
 
 ## Configuration reference
