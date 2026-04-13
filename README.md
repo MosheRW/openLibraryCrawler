@@ -112,6 +112,18 @@ settings:
 python main.py
 ```
 
+## Docker
+
+```bash
+# Build
+docker build -t openlibrary-crawler .
+
+# Run — credentials via .env, results persisted to host
+docker run --env-file .env -v "$(pwd)/results:/app/results" openlibrary-crawler
+```
+
+Results land in `results/<timestamp>/` on the host after the run.
+
 The crawler will authenticate, run all configured queries, and write output to `results/<timestamp>/`.
 
 ## Output
