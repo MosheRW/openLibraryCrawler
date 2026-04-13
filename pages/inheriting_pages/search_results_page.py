@@ -1,7 +1,7 @@
 import asyncio
 
 from playwright.async_api import Page
-from helpers.logger import Log
+from helpers.logger import Log, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
@@ -26,9 +26,14 @@ class SearchResultsPage(BasePage):
         # an explicit await inside navigate() to ensure errors surface immediately.
 
     async def _log(self):
-        des = await measure_page_performance(self.page, self.page.url, 3000)
+        threshold = 3000
+        des = await measure_page_performance(self.page, self.page.url, threshold)
+        warning = None
+        if not des["is_within_threshold"]:
+            warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
+            print_warning(f"[PERF] search_results_page: {warning}")
         self.logger.add_log(Log(url=self.page.url, page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def navigate(self) -> None:
         await self.page.goto("https://openlibrary.org/")
