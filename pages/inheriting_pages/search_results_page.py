@@ -25,28 +25,30 @@ class SearchResultsPage(BasePage):
 
     async def _log(self):
         threshold = 3000
-        des = await measure_page_performance(self.page, self.page.url, threshold)
+        des = await measure_page_performance(self._page, self._page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
             warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
             print_warning(f"[PERF] search_results_page: {warning}")
-        self.logger.add_log(Log(url=self.page.url, date=datetime.now(), page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+        self.logger.add_log(Log(url=self._page.url, date=datetime.now(), page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
                             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def navigate(self) -> None:
+        await self._page.reload()
         await self._log()
 
     async def get_books(self, limit: int = 5, prev_books: list[Book] | None = None) -> list[Book]:
-        await self.page.wait_for_selector(
+        await self._page.wait_for_selector(
             searchResultsPageSelector["results_list_container"], timeout=5000)
-        book_elements = await self.page.query_selector_all(
+        book_elements = await self._page.query_selector_all(
             searchResultsPageSelector["results_list_container"])
 
         current_limit = limit - len(prev_books) if prev_books else limit
         books: list[Book] = []
+        books_set = set()
 
         for element in book_elements:
-            if len(books) >= current_limit:
+            if len(books) >= current_limit or len(books_set) >= current_limit:
                 break
 
             title_element = await element.query_selector(
@@ -75,7 +77,10 @@ class SearchResultsPage(BasePage):
             year = int(year_text) if year_text.isdigit() else 0
             url = f"https://openlibrary.org/{url_element.split('/')[1]}/{url_element.split('/')[2]}" if url_element else None
 
-            books.append(Book(title, author, year, url))
+            book = Book(title, author, year, url)
+            if book.url not in books_set:
+                books.append(book)
+                books_set.add(book.url)
 
         if prev_books is not None:
             books = prev_books + books
@@ -92,16 +97,16 @@ class SearchResultsPage(BasePage):
 
     async def get_books_urls(self, limit: int = 5) -> list[str]:
         books = await self.get_books(limit)
-        books_set = set([book.url for book in books if book.url is not None])
-        return list(books_set)
+        books_set = [book.url for book in books if book.url is not None]
+        return books_set
 
     async def go_to_next_page(self) -> None:
-        next_button = await self.page.query_selector(
+        next_button = await self._page.query_selector(
             searchResultsPageSelector["next_button"])
 
         if next_button:
             await next_button.click()
-            await self.page.wait_for_load_state("load")
+            await self._page.wait_for_load_state("load")
             self.current_page += 1
             await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
 

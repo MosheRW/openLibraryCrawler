@@ -15,11 +15,8 @@ async def add_books_to_reading_list(urls: list[str]):
     if not urls:
         return want_to_read, already_read
 
-    book_page = await BookPage.create(urls[0])
-    for index, url in enumerate(urls):
-        if index > 0:
-            book_page.book_url = url
-            await book_page.navigate()
+    for url in urls:
+        book_page = await BookPage.create(url)
 
         # Random shelf assignment exercises both "Want to Read" and "Already Read"
         # code paths in a single run. Runs are intentionally non-reproducible.
