@@ -6,6 +6,7 @@ from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
+from helpers.configs import Config
 from datetime import datetime
 book_page_selector = {
     "master button": "button.book-progress-btn.primary-action > span.btn-text",
@@ -27,7 +28,7 @@ class BookPage(BasePage):
         self.book_url = book_url
 
     async def _log(self, title: str = ""):
-        threshold = 2500
+        threshold = Config().settings.thresholds.book_ms
         des = await measure_page_performance(self._page, self._page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
