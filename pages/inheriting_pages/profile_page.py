@@ -1,6 +1,6 @@
 from playwright.async_api import Page
 from helpers.configs import Config
-from helpers.logger import Log, print_error, print_info
+from helpers.logger import Log, print_error, print_info, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
@@ -30,16 +30,18 @@ class ProfilePage(BasePage):
         config = Config()
         await instance.navigate(config.account.username)
         await instance.initialize()
-        des = await measure_page_performance(instance.page, instance.page.url, 2000)
-        instance.logger.add_log(Log(url=instance.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
         return instance
 
     async def navigate(self, username: str) -> None:
         await self.page.goto(f"https://openlibrary.org/people/{username}/books")
-        des = await measure_page_performance(self.page, self.page.url, 2000)
+        threshold = 2000
+        des = await measure_page_performance(self.page, self.page.url, threshold)
+        warning = None
+        if not des["is_within_threshold"]:
+            warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
+            print_warning(f"[PERF] profile_page: {warning}")
         self.logger.add_log(Log(url=self.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def _get_quantity(self, selector: str) -> int:
         """
