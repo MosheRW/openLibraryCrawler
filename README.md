@@ -104,6 +104,8 @@ settings:
 
 > **Note:** `options.yaml` contains plaintext credentials — keep it out of version control. It is already listed in `.gitignore`.
 
+> **CI/CD:** Credentials can be supplied via environment variables instead of (or to override) `options.yaml`: `OL_EMAIL`, `OL_USERNAME`, `OL_PASSWORD`.
+
 ## Usage
 
 ```bash
