@@ -1,7 +1,7 @@
 from enum import Enum
 
 from playwright.async_api import Page
-from helpers.logger import Log, print_warning
+from helpers.logger import Log, print_error, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
@@ -45,8 +45,20 @@ class BookPage(BasePage):
         await instance.initialize()
         return instance
 
-    async def navigate(self) -> None:
+    async def navigate(self, count: int = 0) -> None:
         await self.page.goto(self.book_url)
+        
+        if await self.is_503_error():
+            print_warning(
+                "503 error detected on book page, retrying navigation...")
+            if count <= 5:
+                await self.navigate(count + 1)
+            else:
+                print_error(
+                    "Exceeded maximum retry attempts for loading book page.")
+                raise Exception(
+                    "Failed to load book page after multiple attempts.")
+        
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
         await self._log()
 
