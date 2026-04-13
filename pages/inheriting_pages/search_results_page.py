@@ -17,13 +17,18 @@ searchResultsPageSelector = {
 }
 
 
-class SearchResultsPage(BasePage):
+class SearchResultsPage(BasePage):    
+    def __new__(cls, page: Page, query: str = ""):
+        instance = super().__new__(cls)
+        instance.current_page = 1
+        instance.query = query
+        asyncio.create_task(instance._log())  # Fire-and-forget logging task
+        return instance
+    
     def __init__(self, page: Page, query: str = ""):
         super().__init__(page)
         self.current_page = 1
         self.query = query
-        # _log() was previously fired as a fire-and-forget task here, but moved to
-        # an explicit await inside navigate() to ensure errors surface immediately.
 
     async def _log(self):
         threshold = 3000
