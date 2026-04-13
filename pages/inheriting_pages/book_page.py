@@ -47,7 +47,7 @@ class BookPage(BasePage):
 
     async def navigate(self, count: int = 0) -> None:
         await self.page.goto(self.book_url)
-        
+
         if await self.is_503_error():
             print_warning(
                 "503 error detected on book page, retrying navigation...")
@@ -58,7 +58,7 @@ class BookPage(BasePage):
                     "Exceeded maximum retry attempts for loading book page.")
                 raise Exception(
                     "Failed to load book page after multiple attempts.")
-        
+
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
         await self._log()
 
@@ -76,31 +76,31 @@ class BookPage(BasePage):
         master_element = await self.page.query_selector(
             book_page_selector["master button active"])
 
-        "if the master button is inactive:"
+        # if the master button is inactive:
         if master_element is None:
             master_element = await self.page.query_selector(
                 book_page_selector["master button"])
 
-            "if there is no master button, we return failure:"
+        # if there is no master button, we return failure:
             if master_element is None:
                 return ReadingStatus.FAILURE
 
-            "if the master button is inactive and its title matches the provided title, we click it and return success:"
+        # if the master button is inactive and its title matches the provided title, we click it and return success:
             if (await master_element.inner_text()).strip().lower() == title.lower():
                 await master_element.click()
                 return ReadingStatus.SUCCESS
 
-            "if the master button is inactive and its title does not match the provided title, we return not success:"
+        # if the master button is inactive and its title does not match the provided title, we return not success:
             return ReadingStatus.NOT_SUCCESS
 
-        "if the master button is active, we compare its title with the provided title:"
+        # if the master button is active, we compare its title with the provided title:
         element_title = (await master_element.inner_text()).strip().lower()
 
-        "if the master button is active and its title matches the provided title, we return success:"
+        # if the master button is active and its title matches the provided title, we return success:
         if element_title == title.lower():
             return ReadingStatus.SUCCESS
         elif element_title != title.lower():
-            "if the master button is active and its title does not match the provided title, we return not success:"
+            # if the master button is active and its title does not match the provided title, we return not success:
             return ReadingStatus.NOT_SUCCESS
 
         return ReadingStatus.FAILURE  # unreachable: the two conditions above are exhaustive
