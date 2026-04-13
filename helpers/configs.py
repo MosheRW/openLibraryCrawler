@@ -30,9 +30,28 @@ class Account:
         return self._password
 
 
+class Thresholds:
+    def __init__(self, search_results_ms: int = 3000, book_ms: int = 2500, profile_ms: int = 2000):
+        self._search_results_ms = search_results_ms
+        self._book_ms = book_ms
+        self._profile_ms = profile_ms
+
+    @property
+    def search_results_ms(self) -> int:
+        return self._search_results_ms
+
+    @property
+    def book_ms(self) -> int:
+        return self._book_ms
+
+    @property
+    def profile_ms(self) -> int:
+        return self._profile_ms
+
+
 class Settings:
     def __init__(self, headless: bool = True, output_format: str = "json", output_directory: str = "results",
-                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log"):
+                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log", thresholds: dict = None):
         self._headless = headless
         self._output_format = output_format
         self._output_directory = output_directory
@@ -42,6 +61,7 @@ class Settings:
         self._save_results = save_results
         self._log_level = log_level
         self._log_file = log_file
+        self._thresholds = Thresholds(**(thresholds or {}))
 
     @property
     def headless(self) -> bool:
@@ -78,6 +98,10 @@ class Settings:
     @property
     def log_file(self) -> str:
         return self._log_file
+
+    @property
+    def thresholds(self) -> Thresholds:
+        return self._thresholds
 
 
 class Query:
