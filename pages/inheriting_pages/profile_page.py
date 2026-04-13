@@ -6,11 +6,6 @@ from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
 
-# OpenLibrary's reading-list UI goes stale after several successive book removals:
-# the "remove" button stops responding. Reloading every N iterations resets the DOM.
-# The value 5 was found empirically as the point where the UI typically stalls.
-ITERATIONS_BEFORE_RELOAD = 5
-
 profile_page_selector = {
     "want to read count": "a[data-ol-link-track='MyBooksSidebar|WantToRead'] > span.li-count",
     "currently reading count": "a[data-ol-link-track='MyBooksSidebar|CurrentlyReading'] > span.li-count",
@@ -113,7 +108,6 @@ class ProfilePage(BasePage):
         """
 
         await self.page.click(shelf_click_selector)
-        counter = 0
 
         while True:
             button = await self.page.query_selector(profile_page_selector["clear shelf"])
@@ -124,17 +118,16 @@ class ProfilePage(BasePage):
             else:
                 current_url = self.page.url
                 await button.click()
+                
+                print_info("Book removed, checking for next one...")
 
                 if self.page.url == current_url:
                     await self.page.wait_for_timeout(1000)
                 else:
                     await self.page.go_back()
+                    continue
 
-                if counter == ITERATIONS_BEFORE_RELOAD:
-                    await self.page.reload()
-                    counter = 0
-                counter += 1
-                print_info("Book removed, checking for next one...")
+                await self.page.reload()
 
     async def remove_all_books_from_shelves(self) -> None:
         print_info("Clearing 'Want to Read' shelf...")
