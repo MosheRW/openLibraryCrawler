@@ -1,5 +1,8 @@
 import os
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Account:
@@ -119,10 +122,14 @@ class Config:
             with open("options.yaml", "r") as f:
                 config_data = yaml.safe_load(f)
                 account_data = config_data["account"]
+
                 self._account = Account(
-                    email=os.environ.get("OL_EMAIL") or account_data["email"],
-                    username=os.environ.get("OL_USERNAME") or account_data["username"],
-                    password=os.environ.get("OL_PASSWORD") or account_data["password"],
+                    email=get_record_from_env(
+                        "OL_EMAIL") or account_data["email"],
+                    username=get_record_from_env(
+                        "OL_USERNAME") or account_data["username"],
+                    password=get_record_from_env(
+                        "OL_PASSWORD") or account_data["password"],
                 )
                 self._queries = [Query(**query)
                                  for query in config_data["queries"]]
@@ -152,3 +159,10 @@ class Config:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+
+def get_record_from_env(key: str) -> str | None:
+    value = os.environ.get(key)
+    if value is None or value.strip() == "" or not isinstance(value, str):
+        return None
+    return value.strip()
