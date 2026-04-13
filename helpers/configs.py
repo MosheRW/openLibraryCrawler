@@ -1,3 +1,4 @@
+import os
 import yaml
 
 
@@ -117,7 +118,12 @@ class Config:
         try:
             with open("options.yaml", "r") as f:
                 config_data = yaml.safe_load(f)
-                self._account = Account(**config_data["account"])
+                account_data = config_data["account"]
+                self._account = Account(
+                    email=os.environ.get("OL_EMAIL") or account_data["email"],
+                    username=os.environ.get("OL_USERNAME") or account_data["username"],
+                    password=os.environ.get("OL_PASSWORD") or account_data["password"],
+                )
                 self._queries = [Query(**query)
                                  for query in config_data["queries"]]
                 self._settings = Settings(**config_data["settings"])
