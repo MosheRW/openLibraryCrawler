@@ -17,17 +17,14 @@ def _screenshot_section(screenshots_dir: Path) -> str:
     if not screenshots_dir.exists():
         return ""
 
-    # glob("*.png") only matches files directly in screenshots_dir.
-    # Book-page screenshots are stored in query-named subdirectories and will
-    # not appear in the gallery. Use "**/*.png" to include subdirectories.
-    book_shots = sorted(screenshots_dir.glob("*.png"))
+    book_shots = sorted(screenshots_dir.glob("**/*.png"))
     if not book_shots:
         return ""
 
     items = ""
     for shot in book_shots:
         title = shot.stem.replace("_", " ").replace("  ", " ").strip()
-        src = f"screenshots/{shot.name}"
+        src = f"screenshots/{shot.relative_to(screenshots_dir).as_posix()}"
         items += f"""
         <div class="gallery-item" onclick="openLightbox('{src}', '{title}')">
           <img src="{src}" alt="{title}" loading="lazy">
