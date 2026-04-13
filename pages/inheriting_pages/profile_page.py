@@ -42,7 +42,7 @@ class ProfilePage(BasePage):
                 raise Exception(
                     "Failed to load profile page after multiple attempts.")
 
-        threshold = 2000
+        threshold = Config().settings.thresholds.profile_ms
         des = await measure_page_performance(self._page, self._page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
