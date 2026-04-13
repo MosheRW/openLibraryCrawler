@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 
 
@@ -67,28 +68,44 @@ def generate_report(results_path: Path) -> None:
     passed = sum(1 for e in data if e["is_within_threshold"])
     failed = total - passed
     pass_rate = round(passed / total * 100) if total else 0
-    avg_load = round(sum(e["load_time_ms"] for e in data) / total) if total else 0
-    avg_fp = round(sum(e["first_paint_ms"] for e in data) / total) if total else 0
-    avg_dcl = round(sum(e["dom_content_loaded_ms"] for e in data) / total) if total else 0
+    avg_load = round(sum(e["load_time_ms"]
+                     for e in data) / total) if total else 0
+    avg_fp = round(sum(e["first_paint_ms"]
+                   for e in data) / total) if total else 0
+    avg_dcl = round(sum(e["dom_content_loaded_ms"]
+                    for e in data) / total) if total else 0
 
     page_types: dict[str, list] = {}
     for e in data:
         page_types.setdefault(e["page"], []).append(e)
 
-    timestamp = results_path.name
+    if raw and "date" in raw[0]:
+        timestamp = raw[0]["date"]
+    else:
+        try:
+            timestamp = datetime.strptime(
+                results_path.name, "%Y%m%d%H%M%S").strftime("%d %b %Y, %H:%M:%S")
+        except ValueError:
+            timestamp = results_path.name
 
-    bar_labels = json.dumps([f"{e['page'].replace('_page', '')} #{i + 1}" for i, e in enumerate(data)])
+    bar_labels = json.dumps([e.get(
+        "description") or f"{e['page'].replace('_page', '')} #{i + 1}" for i, e in enumerate(data)])
     bar_load = json.dumps([e["load_time_ms"] for e in data])
     bar_fp = json.dumps([e["first_paint_ms"] for e in data])
     bar_dcl = json.dumps([e["dom_content_loaded_ms"] for e in data])
-    bar_colors = json.dumps(["rgba(34,197,94,0.85)" if e["is_within_threshold"] else "rgba(239,68,68,0.85)" for e in data])
-    bar_border = json.dumps(["#22c55e" if e["is_within_threshold"] else "#ef4444" for e in data])
+    bar_colors = json.dumps(
+        ["rgba(34,197,94,0.85)" if e["is_within_threshold"] else "rgba(239,68,68,0.85)" for e in data])
+    bar_border = json.dumps(
+        ["#22c55e" if e["is_within_threshold"] else "#ef4444" for e in data])
 
     table_rows = ""
     for i, e in enumerate(data):
         status = "pass" if e["is_within_threshold"] else "fail"
         label = "PASS" if e["is_within_threshold"] else "FAIL"
         short_url = e["url"].replace("https://openlibrary.org", "...")
+        desc = e.get("description") or "—"
+        warning_html = f' <span class="badge warn" title="{e["warning"]}">\u26a0 WARN</span>' if e.get(
+            "warning") else ""
         table_rows += f"""
         <tr class="{status}-row" data-load="{e['load_time_ms']}" data-fp="{e['first_paint_ms']}" data-dcl="{e['dom_content_loaded_ms']}">
             <td class="num">{i + 1}</td>
@@ -386,7 +403,8 @@ def generate_report(results_path: Path) -> None:
           <tr>
             <th class="num">#</th>
             <th>Page Type</th>
-            <th>URL</th>
+            <th>Description</th>
+             <th>URL</th>
             <th class="num" data-col="fp">First Paint <span class="sort-icon">&#8597;</span></th>
             <th class="num" data-col="dcl">DOM Loaded <span class="sort-icon">&#8597;</span></th>
             <th class="num" data-col="load">Load Time <span class="sort-icon">&#8597;</span></th>
@@ -482,3 +500,9 @@ def generate_report(results_path: Path) -> None:
         f.write(html)
 
     print(f"\033[92m[REPORT]\033[0m HTML report saved: {out}")
+
+
+if __name__ == "__main__":
+    path = Path('results', '20260413172108')
+    generate_report(path)
+    print("Report generation complete.")
