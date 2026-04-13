@@ -1,3 +1,5 @@
+import string
+
 from playwright.async_api import ElementHandle, Page
 from helpers.configs import Config
 
@@ -26,14 +28,14 @@ class AuthPage:
 
     async def login(self) -> None:
         if not await self._is_logged_in():
-            await self._navigate()
+            previous_url = await self._navigate()
             cred = self._get_credentials()
             if cred is None:
                 raise ValueError("Credentials not found in the configuration.")
 
             email, username, password = cred
             if email and password:
-                await self._log_in(email, password)
+                await self._log_in(email, password, previous_url)
 
     async def _is_logged_in(self) -> bool:
         if self.page is None:
@@ -56,12 +58,14 @@ class AuthPage:
         await self.page.wait_for_selector(
             auth_page_selector["container"], timeout=5000)
 
-    async def _navigate(self) -> None:
+    async def _navigate(self) -> str:
         if self._log_in_element is None:
             raise ValueError("Login element not found on the page.")
+        current_url = self.page.url
         await self._log_in_element.click()
+        return current_url
 
-    async def _log_in(self, username: str, password: str) -> None:
+    async def _log_in(self, username: str, password: str, previous_url: str) -> None:
         # OpenLibrary's login form accepts the email address in the field
         # named 'username'. The caller passes email as the first argument.
         await self._await_page_load()
@@ -88,6 +92,11 @@ class AuthPage:
         # OpenLibrary doesn't expose a reliable post-login DOM signal (no unique
         # element appears, no predictable URL pattern). A fixed timeout allows the
         # session cookie to be set and the page to settle before checking login state.
-        await self.page.wait_for_timeout(5000)
+
+        # await self.page.wait_for_timeout(5000)
+
+        # await self.page.wait_for_load_state('domcontentloaded')
+        await self.page.wait_for_url(previous_url)
+
         if not await self._is_logged_in():
             raise ValueError("Login failed. Please check your credentials.")
