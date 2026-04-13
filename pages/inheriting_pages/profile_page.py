@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from playwright.async_api import Page
 from helpers.configs import Config
 from helpers.logger import Log, print_error, print_info, print_warning
@@ -46,7 +48,7 @@ class ProfilePage(BasePage):
         if not des["is_within_threshold"]:
             warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
             print_warning(f"[PERF] profile_page: {warning}")
-        self.logger.add_log(Log(url=self.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+        self.logger.add_log(Log(url=self.page.url, date=datetime.now(), page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
                             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def _get_quantity(self, selector: str) -> int:

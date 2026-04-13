@@ -7,7 +7,7 @@ def _deduplicate(data: list) -> list:
     seen = set()
     result = []
     for e in data:
-        key = (e["url"], e["page"])
+        key = (e["url"], e["page"], e.get("description", ""))
         if key not in seen:
             seen.add(key)
             result.append(e)
@@ -100,6 +100,8 @@ def generate_report(results_path: Path) -> None:
 
     table_rows = ""
     for i, e in enumerate(data):
+        date = datetime.strptime(
+            e["date"], "%d/%m/%Y, %H:%M:%S").strftime("%d %b %Y, %H:%M:%S") if "date" in e else "—"
         status = "pass" if e["is_within_threshold"] else "fail"
         label = "PASS" if e["is_within_threshold"] else "FAIL"
         short_url = e["url"].replace("https://openlibrary.org", "...")
@@ -109,12 +111,14 @@ def generate_report(results_path: Path) -> None:
         table_rows += f"""
         <tr class="{status}-row" data-load="{e['load_time_ms']}" data-fp="{e['first_paint_ms']}" data-dcl="{e['dom_content_loaded_ms']}">
             <td class="num">{i + 1}</td>
+            <td class="desc-cell">{date}</td>            
             <td><span class="page-tag">{e['page'].replace('_', ' ')}</span></td>
+            <td class="desc-cell">{desc}</td>
             <td class="url-cell"><a href="{e['url']}" target="_blank" title="{e['url']}">{short_url}</a></td>
             <td class="num">{e['first_paint_ms']}</td>
             <td class="num">{e['dom_content_loaded_ms']}</td>
             <td class="num">{e['load_time_ms']}</td>
-            <td><span class="badge {status}">{label}</span></td>
+            <td><div class="badge-container"><span class="badge {status}">{label}</span>{warning_html}</div></td>
         </tr>"""
 
     page_type_cards = ""
@@ -279,8 +283,18 @@ def generate_report(results_path: Path) -> None:
   .lb-close:hover {{ background: var(--red); border-color: var(--red); }}
 
   /* ── Table ── */
-  .table-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: .875rem; }}
+  .table-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: fit-content; }}
+  table {{ width: auto; border-collapse: collapse; font-size: .875rem; }}
+  #resultsTable {{ table-layout: fixed; }}
+  #resultsTable th:nth-child(1) {{ width: 44px; }}
+  #resultsTable th:nth-child(1) {{ width: 100px; }}
+  #resultsTable th:nth-child(2) {{ width: 180px; }}
+  #resultsTable th:nth-child(3) {{ width: 250px; }}
+  #resultsTable th:nth-child(4) {{ width: 200px; }}
+  #resultsTable th:nth-child(5) {{ width: 95px; }}
+  #resultsTable th:nth-child(6) {{ width: 100px; }}
+  #resultsTable th:nth-child(7) {{ width: 95px; }}
+  #resultsTable th:nth-child(8) {{ width: 170px; }}
   thead {{ background: var(--surface2); }}
   th {{
     padding: .9rem 1rem; text-align: left; font-size: .75rem; font-weight: 600;
@@ -296,19 +310,24 @@ def generate_report(results_path: Path) -> None:
   tr.fail-row:hover {{ background: rgba(239,68,68,.05); }}
   .num {{ font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }}
   td.num {{ color: var(--text); }}
+  .url-container {{display: flex; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}}
+  .url-cell {{ overflow: hidden; white-space: nowrap; text-overflow: ellipsis;width: 100%; max-width: 300px; }}
   .url-cell a {{ color: #818cf8; text-decoration: none; font-size: .8rem; }}
   .url-cell a:hover {{ color: #a5b4fc; text-decoration: underline; }}
   .page-tag {{
     display: inline-block; padding: .2rem .6rem; border-radius: 99px;
     background: var(--surface2); border: 1px solid var(--border);
-    font-size: .72rem; font-weight: 600; color: var(--muted); white-space: nowrap;
-  }}
+    font-size: .72rem; font-weight: 600; color: var(--muted); white-space: nowrap; }}
+  .badge-container {{ display: flex; flex-flow: column; align-items: center; gap: .4rem; }}
   .badge {{
-    display: inline-block; padding: .25rem .7rem; border-radius: 99px;
+    display: inline-block; padding: .25rem .7rem; border-radius: 99px; width: max-content;
+    
     font-size: .72rem; font-weight: 700; letter-spacing: .5px;
   }}
-  .badge.pass {{ background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }}
-  .badge.fail {{ background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }}
+  .badge.pass {{ background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3);align-self: center; justify-self: center; }}
+  .badge.fail {{ background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3);align-self: center; justify-self: center; }}
+  .badge.warn {{ background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); margin-left: .4rem; cursor: help;align-self: center; justify-self: center; }}
+  .desc-cell {{ font-size: .78rem; color: var(--muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* ── Footer ── */
   footer {{ text-align: center; color: var(--muted); font-size: .75rem; padding: 2rem 1rem; border-top: 1px solid var(--border); }}
@@ -401,7 +420,8 @@ def generate_report(results_path: Path) -> None:
       <table id="resultsTable">
         <thead>
           <tr>
-            <th class="num">#</th>
+            <th class="num">#</th>            
+            <th>timestamp</th>
             <th>Page Type</th>
             <th>Description</th>
              <th>URL</th>
