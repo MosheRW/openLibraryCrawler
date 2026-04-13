@@ -150,3 +150,6 @@ The crawler will authenticate, run all configured queries, and write output to `
 | `settings.headless` | bool | Run browser without a visible window |
 | `settings.initialize_book_shelves` | bool | Clear all shelves before starting |
 | `settings.save_results` | bool | Write screenshots and performance report to disk |
+| `settings.thresholds.search_results_ms` | int | Max acceptable load time (ms) for the search results page (default: `3000`) |
+| `settings.thresholds.book_ms` | int | Max acceptable load time (ms) for individual book pages (default: `2500`) |
+| `settings.thresholds.profile_ms` | int | Max acceptable load time (ms) for the user profile page (default: `2000`) |
