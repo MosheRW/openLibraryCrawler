@@ -32,8 +32,19 @@ class ProfilePage(BasePage):
         await instance.initialize()
         return instance
 
-    async def navigate(self, username: str) -> None:
+    async def navigate(self, username: str, count: int = 0) -> None:
         await self.page.goto(f"https://openlibrary.org/people/{username}/books")
+        if await self.is_503_error():
+            print_error(
+                "503 error detected on profile page, retrying navigation...")
+            if count <= 5:
+                await self.navigate(username, count + 1)
+            else:
+                print_error(
+                    "Exceeded maximum retry attempts for loading profile page.")
+                raise Exception(
+                    "Failed to load profile page after multiple attempts.")
+
         threshold = 2000
         des = await measure_page_performance(self.page, self.page.url, threshold)
         warning = None
@@ -108,13 +119,14 @@ class ProfilePage(BasePage):
             button = await self.page.query_selector(profile_page_selector["clear shelf"])
 
             if button is None:
+                print_info("No more books to remove from this shelf.")
                 break
             else:
                 current_url = self.page.url
                 await button.click()
 
                 if self.page.url == current_url:
-                    await self.page.wait_for_timeout(200)
+                    await self.page.wait_for_timeout(1000)
                 else:
                     await self.page.go_back()
 
@@ -122,6 +134,7 @@ class ProfilePage(BasePage):
                     await self.page.reload()
                     counter = 0
                 counter += 1
+                print_info("Book removed, checking for next one...")
 
     async def remove_all_books_from_shelves(self) -> None:
         print_info("Clearing 'Want to Read' shelf...")
