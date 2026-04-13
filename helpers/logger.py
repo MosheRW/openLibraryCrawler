@@ -1,6 +1,4 @@
 from helpers.results import Results
-from helpers.screenshots_taker import ScreenshotsTaker
-
 from .configs import Config
 import json
 import logging
