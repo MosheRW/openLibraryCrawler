@@ -6,15 +6,15 @@ queries:
   - query: "python programming"
     max_year: 2024
     limit: 3
-  - query: "data science"
-    max_year: 2024
-    limit: 5
-  - query: "romance novels"
-    max_year: 2024
-    limit: 4
-  - query: "history books"
-    max_year: 2024
-    limit: 6
+  # - query: "data science"
+  #   max_year: 2024
+  #   limit: 5
+  # - query: "romance novels"
+  #   max_year: 2024
+  #   limit: 4
+  # - query: "history books"
+  #   max_year: 2024
+  #   limit: 6
 settings:
   headless: false
   output_format: "json"
@@ -24,3 +24,7 @@ settings:
   save_results: true
   log_level: "INFO"
   log_file: "app.log"
+  thresholds:
+    search_results_ms: 3000
+    book_ms: 2500
+    profile_ms: 2000

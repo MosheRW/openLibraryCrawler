@@ -24,3 +24,7 @@ settings:
   save_results: true
   log_level: "INFO"
   log_file: "app.log"
+  thresholds:
+    search_results_ms: 3000
+    book_ms: 2500
+    profile_ms: 2000
