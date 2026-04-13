@@ -5,6 +5,7 @@ from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from utils.book import Book
+from helpers.configs import Config
 
 searchResultsPageSelector = {
     "results_list_container": "li.searchResultItem",
@@ -24,7 +25,7 @@ class SearchResultsPage(BasePage):
         self.query = query
 
     async def _log(self):
-        threshold = 3000
+        threshold = Config().settings.thresholds.search_results_ms
         des = await measure_page_performance(self._page, self._page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
