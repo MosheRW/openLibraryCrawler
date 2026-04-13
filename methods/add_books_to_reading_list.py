@@ -1,4 +1,4 @@
-from helpers.logger import print_info
+from helpers.logger import print_error, print_info
 from pages.inheriting_pages.book_page import BookPage
 
 import random
@@ -25,19 +25,25 @@ async def add_books_to_reading_list(urls: list[str]):
         # code paths in a single run. Runs are intentionally non-reproducible.
         if random.choice([True, False]):
             res = await book_page.set_book_as_want_to_read()
-            want_to_read += 1
-            # If the book was already in the "Already Read" shelf, it decreases the "Already Read" counter after it moved to "Want to Read" shelf
-            if res == -1:
-                print_info(
-                    f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
-                already_read -= 1
+            if res == 0:
+                print_error(f"Failed to add {url} to 'Want to Read' shelf, skipping counter.")
+            else:
+                want_to_read += 1
+                # If the book was already in the "Already Read" shelf, it decreases the "Already Read" counter after it moved to "Want to Read" shelf
+                if res == -1:
+                    print_info(
+                        f"Book at {url} was already in 'Already Read' shelf, skipping addition.")
+                    already_read -= 1
         else:
             res = await book_page.set_book_as_already_read()
-            already_read += 1
-            # If the book was already in the "Want to Read" shelf, it decreases the "Want to Read" counter after it moved to "Already Read" shelf
-            if res == -1:
-                print_info(
-                    f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
-                want_to_read -= 1
+            if res == 0:
+                print_error(f"Failed to add {url} to 'Already Read' shelf, skipping counter.")
+            else:
+                already_read += 1
+                # If the book was already in the "Want to Read" shelf, it decreases the "Want to Read" counter after it moved to "Already Read" shelf
+                if res == -1:
+                    print_info(
+                        f"Book at {url} was already in 'Want to Read' shelf, skipping addition.")
+                    want_to_read -= 1
 
     return want_to_read, already_read

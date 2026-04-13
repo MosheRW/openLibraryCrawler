@@ -1,7 +1,7 @@
 from enum import Enum
 
 from playwright.async_api import Page
-from helpers.logger import Log
+from helpers.logger import Log, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
@@ -27,9 +27,14 @@ class BookPage(BasePage):
         self.book_url = book_url
 
     async def _log(self):
-        des = await measure_page_performance(self.page, self.page.url, 2500)
+        threshold = 2500
+        des = await measure_page_performance(self.page, self.page.url, threshold)
+        warning = None
+        if not des["is_within_threshold"]:
+            warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
+            print_warning(f"[PERF] book_page: {warning}")
         self.logger.add_log(Log(url=self.book_url, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     @classmethod
     async def create(cls, book_url: str, page: Page | None = None) -> "BookPage":
@@ -115,9 +120,15 @@ class BookPage(BasePage):
 
         await self._log()
         title = await self.page.title()
-        # Brief wait for the shelf button animation to settle before taking the
-        # screenshot, so the captured state reflects the confirmed shelf status.
-        await self.page.wait_for_timeout(1000)
+        # Wait for the activated button state to appear in the DOM, confirming
+        # the shelf change before taking the screenshot. Falls back gracefully
+        # if the button never activates (e.g. book was already in that state).
+        try:
+            await self.page.wait_for_selector(
+                book_page_selector["master button active"], timeout=3000
+            )
+        except Exception:
+            pass
         await self.take_screenshot(title_to_filename(title))
 
         if result == ReadingStatus.FAILURE:
