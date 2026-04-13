@@ -5,16 +5,16 @@ account:
 queries:
   - query: "python programming"
     max_year: 2024
-    limit: 10
+    limit: 3
   - query: "data science"
     max_year: 2024
-    limit: 15
+    limit: 5
   - query: "romance novels"
     max_year: 2024
-    limit: 12
+    limit: 4
   - query: "history books"
     max_year: 2024
-    limit: 18
+    limit: 6
 settings:
   headless: false
   output_format: "json"
