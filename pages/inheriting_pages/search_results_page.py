@@ -1,5 +1,4 @@
-import asyncio
-
+from datetime import datetime
 from playwright.async_api import Page
 from helpers.logger import Log, print_warning
 from helpers.results import title_to_filename
@@ -17,14 +16,8 @@ searchResultsPageSelector = {
 }
 
 
-class SearchResultsPage(BasePage):    
-    def __new__(cls, page: Page, query: str = ""):
-        instance = super().__new__(cls)
-        instance.current_page = 1
-        instance.query = query
-        asyncio.create_task(instance._log())  # Fire-and-forget logging task
-        return instance
-    
+class SearchResultsPage(BasePage):
+
     def __init__(self, page: Page, query: str = ""):
         super().__init__(page)
         self.current_page = 1
@@ -37,11 +30,10 @@ class SearchResultsPage(BasePage):
         if not des["is_within_threshold"]:
             warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
             print_warning(f"[PERF] search_results_page: {warning}")
-        self.logger.add_log(Log(url=self.page.url, page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+        self.logger.add_log(Log(url=self.page.url, date=datetime.now(), page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
                             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def navigate(self) -> None:
-        await self.page.goto("https://openlibrary.org/")
         await self._log()
 
     async def get_books(self, limit: int = 5, prev_books: list[Book] | None = None) -> list[Book]:
@@ -56,7 +48,7 @@ class SearchResultsPage(BasePage):
         for element in book_elements:
             if len(books) >= current_limit:
                 break
-            
+
             title_element = await element.query_selector(
                 searchResultsPageSelector["title"])
             author_element = await element.query_selector(
@@ -112,3 +104,9 @@ class SearchResultsPage(BasePage):
             await self.page.wait_for_load_state("load")
             self.current_page += 1
             await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
+
+
+async def search_results_page_factory(page: Page, query: str = "") -> SearchResultsPage:
+    results = SearchResultsPage(page, query)
+    await results.navigate()
+    return results

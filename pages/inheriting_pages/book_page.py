@@ -6,7 +6,7 @@ from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
-
+from datetime import datetime
 book_page_selector = {
     "master button": "button.book-progress-btn.primary-action > span.btn-text",
     "master button active": "button.book-progress-btn.primary-action.activated > span.btn-text",
@@ -26,14 +26,14 @@ class BookPage(BasePage):
         super().__init__(page)
         self.book_url = book_url
 
-    async def _log(self):
+    async def _log(self, title: str = ""):
         threshold = 2500
         des = await measure_page_performance(self.page, self.page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
             warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
-            print_warning(f"[PERF] book_page: {warning}")
-        self.logger.add_log(Log(url=self.book_url, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+            print_warning(f"[PERF] book_page{title}: {warning}")
+        self.logger.add_log(Log(date=datetime.now(), url=self.book_url, description=title, page="book_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     @classmethod
@@ -60,7 +60,7 @@ class BookPage(BasePage):
                     "Failed to load book page after multiple attempts.")
 
         await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
-        await self._log()
+        await self._log(" - navigate")
 
     async def click_master_reading_button(self, title: str) -> ReadingStatus:
         """
@@ -130,7 +130,7 @@ class BookPage(BasePage):
             if res == ReadingStatus.SUCCESS:
                 result = ReadingStatus.SUCCESS
 
-        await self._log()
+        await self._log(" - set_book_as_" + title.lower().replace(" ", "_"))
         title = await self.page.title()
         # Wait for the activated button state to appear in the DOM, confirming
         # the shelf change before taking the screenshot. Falls back gracefully
