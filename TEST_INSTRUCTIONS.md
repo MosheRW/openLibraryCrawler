@@ -78,7 +78,7 @@ async def measure_page_performance(page, url: str, threshold_ms: int) -> dict:
 # תרגיל באגים – ניתוח סטטי (20 דקות)
 
 הוראה: ללא שימוש בכלים/מחשב.  
-כתוב ב־ReadMeAllBugs.md לפחות 3 בעיות + הסבר + תיקון.
+כתוב ב־ReadMeAIBugs.md לפחות 3 בעיות + הסבר + תיקון.
 
 ---
 
@@ -165,7 +165,7 @@ asyncio.run(main())
 ● README.md – הרצה, ארכיטקטורה, מגבלות  
 ● דוח ריצה (Allure / HTML / JUnit XML)  
 ● performance_report.json  
-● ReadMeAllBugs.md
+● ReadMeAIBugs.md
 
 ---
 
