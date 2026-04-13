@@ -1,6 +1,6 @@
 
 from helpers.configs import Config
-from helpers.logger import print_info
+from helpers.logger import print_error, print_info
 from helpers.screenshots_taker import ScreenshotsTaker
 from methods.add_books_to_reading_list import add_books_to_reading_list
 from methods.assert_reading_list_count import assert_reading_list_count
@@ -29,14 +29,17 @@ async def orchestrator():
     want_to_read_prev, already_read_prev = await profile_page.get_want_and_already_read_quantities("initial")
 
     for query in config.queries:
-        print_info(
-            f"Query: {query.query}, Max Year: {query.max_year}, Limit: {query.limit}")
+        try:
+            print_info(
+                f"Query: {query.query}, Max Year: {query.max_year}, Limit: {query.limit}")
 
-        urls = await search_books_by_title_under_year(query.query, query.max_year, query.limit)
-        print_info(
-            f"Found {len(urls)} books matching criteria for query '{query.query}'")
+            urls = await search_books_by_title_under_year(query.query, query.max_year, query.limit)
+            print_info(
+                f"Found {len(urls)} books matching criteria for query '{query.query}'")
 
-        want_to_read, already_read = await add_books_to_reading_list(urls)
-        want_to_read_prev += want_to_read
-        already_read_prev += already_read
-        await assert_reading_list_count(want_to_read_prev, already_read_prev, query.query)
+            want_to_read, already_read = await add_books_to_reading_list(urls)
+            want_to_read_prev += want_to_read
+            already_read_prev += already_read
+            await assert_reading_list_count(want_to_read_prev, already_read_prev, query.query)
+        except Exception as e:
+            print_error(f"Error processing query '{query.query}': {e}")

@@ -1,5 +1,6 @@
 from playwright.async_api import Page
 from helpers.browser import Browser
+from helpers.logger import print_error
 from helpers.results import title_to_filename
 from pages.inheriting_pages.base_page import BasePage
 from pages.inheriting_pages.search_results_page import SearchResultsPage
@@ -25,8 +26,18 @@ class HomePage(BasePage):
         await instance.initialize()
         return instance
 
-    async def navigate(self) -> None:
+    async def navigate(self, count: int = 0) -> None:
         await self.page.goto("https://openlibrary.org/")
+        if await self.is_503_error():
+            print_error(
+                "503 error detected on home page, retrying navigation...")
+            if count <= 5:
+                await self.navigate(count + 1)
+            else:
+                print_error(
+                    "Exceeded maximum retry attempts for loading home page.")
+                raise Exception(
+                    "Failed to load home page after multiple attempts.")
 
     def _build_query(self, title: str | None, author: str | None, year: int | None) -> str:
         query_parts = []

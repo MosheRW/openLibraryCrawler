@@ -1,5 +1,4 @@
 from playwright.async_api import Page
-from helpers.configs import Config
 from helpers.logger import Logger
 from helpers.screenshots_taker import ScreenshotsTaker
 from pages.auth_page import AuthPage
@@ -33,3 +32,7 @@ class BasePage:
         if name is None:
             name = (await self.page.title()).replace(" ", "_").lower()
         await ScreenshotsTaker().take_screenshot(self.page, name, query)
+
+    async def is_503_error(self) -> bool:
+        content = await self.page.content()
+        return "503 Service Unavailable" in content
