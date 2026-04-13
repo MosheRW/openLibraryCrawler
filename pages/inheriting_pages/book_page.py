@@ -28,7 +28,7 @@ class BookPage(BasePage):
 
     async def _log(self, title: str = ""):
         threshold = 2500
-        des = await measure_page_performance(self.page, self.page.url, threshold)
+        des = await measure_page_performance(self._page, self._page.url, threshold)
         warning = None
         if not des["is_within_threshold"]:
             warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
@@ -46,7 +46,7 @@ class BookPage(BasePage):
         return instance
 
     async def navigate(self, count: int = 0) -> None:
-        await self.page.goto(self.book_url)
+        await self._page.goto(self.book_url)
 
         if await self.is_503_error():
             print_warning(
@@ -59,7 +59,7 @@ class BookPage(BasePage):
                 raise Exception(
                     "Failed to load book page after multiple attempts.")
 
-        await self.page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
+        await self._page.wait_for_selector("div.generic-dropper-wrapper.my-books-dropper")
         await self._log(" - navigate")
 
     async def click_master_reading_button(self, title: str) -> ReadingStatus:
@@ -71,14 +71,14 @@ class BookPage(BasePage):
         If we find it and its title matches the provided title, we click it to mark the book with the desired status and return True.
         If we don't find any master button or if the titles don't match, we return False, indicating that the book is not marked with the desired status and we couldn't change it using the master button.
         """
-        await self.page.wait_for_selector(book_page_selector["master button"])
+        await self._page.wait_for_selector(book_page_selector["master button"])
 
-        master_element = await self.page.query_selector(
+        master_element = await self._page.query_selector(
             book_page_selector["master button active"])
 
         # if the master button is inactive:
         if master_element is None:
-            master_element = await self.page.query_selector(
+            master_element = await self._page.query_selector(
                 book_page_selector["master button"])
 
         # if there is no master button, we return failure:
@@ -99,20 +99,18 @@ class BookPage(BasePage):
         # if the master button is active and its title matches the provided title, we return success:
         if element_title == title.lower():
             return ReadingStatus.SUCCESS
-        elif element_title != title.lower():
+        else:
             # if the master button is active and its title does not match the provided title, we return not success:
             return ReadingStatus.NOT_SUCCESS
 
-        return ReadingStatus.FAILURE  # unreachable: the two conditions above are exhaustive
-
     async def invert_reading_buttons(self) -> None:
-        arrow_element = await self.page.query_selector(
+        arrow_element = await self._page.query_selector(
             book_page_selector["arrow button"])
         if arrow_element is not None:
             await arrow_element.click()
 
     async def click_a_reading_button(self, title: str) -> ReadingStatus:
-        button_elements = await self.page.query_selector_all(
+        button_elements = await self._page.query_selector_all(
             book_page_selector["buttons elements"])
 
         for button in button_elements:
@@ -131,12 +129,12 @@ class BookPage(BasePage):
                 result = ReadingStatus.SUCCESS
 
         await self._log(" - set_book_as_" + title.lower().replace(" ", "_"))
-        title = await self.page.title()
+        title = await self._page.title()
         # Wait for the activated button state to appear in the DOM, confirming
         # the shelf change before taking the screenshot. Falls back gracefully
         # if the button never activates (e.g. book was already in that state).
         try:
-            await self.page.wait_for_selector(
+            await self._page.wait_for_selector(
                 book_page_selector["master button active"], timeout=3000
             )
         except Exception:
