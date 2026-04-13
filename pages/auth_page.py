@@ -1,5 +1,3 @@
-import string
-
 from playwright.async_api import ElementHandle, Page
 from helpers.configs import Config
 
@@ -92,10 +90,6 @@ class AuthPage:
         # OpenLibrary doesn't expose a reliable post-login DOM signal (no unique
         # element appears, no predictable URL pattern). A fixed timeout allows the
         # session cookie to be set and the page to settle before checking login state.
-
-        # await self.page.wait_for_timeout(5000)
-
-        # await self.page.wait_for_load_state('domcontentloaded')
         await self.page.wait_for_url(previous_url)
 
         if not await self._is_logged_in():
