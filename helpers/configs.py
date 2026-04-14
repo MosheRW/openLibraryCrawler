@@ -159,15 +159,11 @@ class Config:
         try:
             with open("options.yaml", "r") as f:
                 config_data = yaml.safe_load(f)
-                account_data = config_data["account"]
 
                 self._account = Account(
-                    email=get_record_from_env(
-                        "OL_EMAIL") or account_data["email"],
-                    username=get_record_from_env(
-                        "OL_USERNAME") or account_data["username"],
-                    password=get_record_from_env(
-                        "OL_PASSWORD") or account_data["password"],
+                    email=get_record_from_env("OL_EMAIL"),
+                    username=get_record_from_env("OL_USERNAME"),
+                    password=get_record_from_env("OL_PASSWORD"),
                 )
                 self._queries = [Query(**query)
                                  for query in config_data["queries"]]
@@ -199,8 +195,9 @@ class Config:
         return self.__str__()
 
 
-def get_record_from_env(key: str) -> str | None:
+def get_record_from_env(key: str) -> str:
     value = os.environ.get(key)
     if value is None or value.strip() == "" or not isinstance(value, str):
-        return None
+        raise Exception(
+            f"the {key} is missing from the environment variables or is empty")
     return value.strip()
