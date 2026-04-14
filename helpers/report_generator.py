@@ -1,5 +1,8 @@
+import hashlib
 import json
-from datetime import datetime
+import uuid
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -12,6 +15,17 @@ def _deduplicate(data: list) -> list:
             seen.add(key)
             result.append(e)
     return result
+
+
+def _load_data(results_path: Path) -> tuple[list, int] | None:
+    report_json = results_path / "performance_report.json"
+    if not report_json.exists():
+        return None
+    with open(report_json) as f:
+        raw = json.load(f)
+    if not raw:
+        return None
+    return _deduplicate(raw), len(raw)
 
 
 def _screenshot_section(screenshots_dir: Path) -> str:
@@ -50,19 +64,118 @@ def _screenshot_section(screenshots_dir: Path) -> str:
   </div>"""
 
 
+def _generate_junit_xml(results_path: Path, data: list) -> None:
+    page_groups: dict[str, list] = {}
+    for e in data:
+        page_groups.setdefault(e["page"], []).append(e)
+
+    total_failures = sum(1 for e in data if not e["is_within_threshold"])
+    total_time = sum(e["load_time_ms"] for e in data) / 1000
+
+    root = ET.Element("testsuites")
+    root.set("name", "OpenLibrary Performance")
+    root.set("tests", str(len(data)))
+    root.set("failures", str(total_failures))
+    root.set("time", f"{total_time:.2f}")
+
+    for page_name, group in page_groups.items():
+        suite_failures = sum(1 for e in group if not e["is_within_threshold"])
+        suite_time = sum(e["load_time_ms"] for e in group) / 1000
+        first_date = group[0].get("date", "")
+        ts_attr = (datetime.strptime(first_date, "%d/%m/%Y, %H:%M:%S").isoformat()
+                   if first_date else "")
+
+        suite = ET.SubElement(root, "testsuite")
+        suite.set("name", page_name)
+        suite.set("tests", str(len(group)))
+        suite.set("failures", str(suite_failures))
+        suite.set("errors", "0")
+        suite.set("time", f"{suite_time:.2f}")
+        suite.set("timestamp", ts_attr)
+
+        for e in group:
+            name = e.get("description") or e["page"]
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", name)
+            tc.set("classname", f"openLibrary.{e['page']}")
+            tc.set("time", f"{e['load_time_ms'] / 1000:.3f}")
+            if not e["is_within_threshold"]:
+                failure = ET.SubElement(tc, "failure")
+                failure.set("message", e.get("warning", "threshold exceeded"))
+                failure.set("type", "PerformanceThresholdExceeded")
+
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+    out = results_path / "report.xml"
+    tree.write(out, encoding="UTF-8", xml_declaration=True)
+    print(f"\033[92m[REPORT]\033[0m JUnit XML saved: {out}")
+
+
+def _generate_allure_results(results_path: Path, data: list) -> None:
+    allure_dir = results_path / "allure-results"
+    allure_dir.mkdir(parents=True, exist_ok=True)
+
+    for e in data:
+        first_date = e.get("date", "")
+        if first_date:
+            dt = datetime.strptime(first_date, "%d/%m/%Y, %H:%M:%S")
+            start_ms = int(dt.timestamp() * 1000)
+        else:
+            start_ms = 0
+        stop_ms = start_ms + e["load_time_ms"]
+
+        raw_key = f"{e['page']}{e.get('description', '')}{e['url']}"
+        history_id = hashlib.md5(raw_key.encode()).hexdigest()
+
+        result = {
+            "uuid": str(uuid.uuid4()),
+            "historyId": history_id,
+            "name": e.get("description") or e["page"],
+            "fullName": f"openLibrary.{e['page']}.{e.get('description', '')}",
+            "status": "passed" if e["is_within_threshold"] else "failed",
+            "start": start_ms,
+            "stop": stop_ms,
+            "labels": [
+                {"name": "parentSuite", "value": "OpenLibrary Performance"},
+                {"name": "suite",       "value": e["page"]},
+                {"name": "feature",     "value": "Page Performance"},
+                {"name": "severity",    "value": "critical"},
+            ],
+            "links": [{"url": e["url"], "name": "Page URL", "type": "link"}],
+            "parameters": [
+                {"name": "First Paint", "value": f"{e['first_paint_ms']}ms"},
+                {"name": "DOM Loaded",  "value": f"{e['dom_content_loaded_ms']}ms"},
+                {"name": "Load Time",   "value": f"{e['load_time_ms']}ms"},
+            ],
+            "statusDetails": {
+                "message": e.get("warning") or None,
+                "trace": "",
+            },
+        }
+        file_path = allure_dir / f"{result['uuid']}-result.json"
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
+
+    categories = [{
+        "name": "Performance Failures",
+        "messageRegex": ".*exceeded threshold.*",
+        "matchedStatuses": ["failed"],
+    }]
+    with open(allure_dir / "categories.json", "w", encoding="utf-8") as f:
+        json.dump(categories, f, indent=2)
+
+    print(f"\033[92m[REPORT]\033[0m Allure results saved: {allure_dir} ({len(data)} results)")
+
+
 def generate_report(results_path: Path) -> None:
-    report_json = results_path / "performance_report.json"
-    if not report_json.exists():
+    result = _load_data(results_path)
+    if result is None:
         return
+    data, raw_count = result
+    duplicates_removed = raw_count - len(data)
 
-    with open(report_json) as f:
-        raw = json.load(f)
-
-    if not raw:
-        return
-
-    data = _deduplicate(raw)
-    duplicates_removed = len(raw) - len(data)
+    _generate_junit_xml(results_path, data)
+    _generate_allure_results(results_path, data)
 
     total = len(data)
     passed = sum(1 for e in data if e["is_within_threshold"])
@@ -79,8 +192,8 @@ def generate_report(results_path: Path) -> None:
     for e in data:
         page_types.setdefault(e["page"], []).append(e)
 
-    if raw and "date" in raw[0]:
-        timestamp = raw[0]["date"]
+    if data and "date" in data[0]:
+        timestamp = data[0]["date"]
     else:
         try:
             timestamp = datetime.strptime(
