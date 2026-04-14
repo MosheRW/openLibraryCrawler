@@ -1,10 +1,19 @@
-from helpers.results import Results
-from helpers.screenshots_taker import ScreenshotsTaker
+from datetime import date
 
+from helpers.results import Results
 from .configs import Config
 import json
+import logging
 from pathlib import Path
 config = Config()
+
+_file_logger = logging.getLogger("openLibraryCrawler")
+_file_logger.setLevel(
+    getattr(logging, config.settings.log_level.upper(), logging.INFO))
+_handler = logging.FileHandler(config.settings.log_file, encoding="utf-8")
+_handler.setFormatter(logging.Formatter(
+    "%(asctime)s %(levelname)-8s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+_file_logger.addHandler(_handler)
 
 
 def print_info(message):
@@ -17,26 +26,38 @@ def print_error(message):
         print(f"\033[91m[ERROR]\033[0m {message}")
 
 
+def print_warning(message):
+    if config.settings.print_info:
+        print(f"\033[93m[WARNING]\033[0m {message}")
+
+
 class Log:
 
+    _date: date
     _url: str
+    _description: str
     _page: str
     _first_paint_ms: int
     _dom_content_loaded_ms: int
     _load_time_ms: int
     _is_within_threshold: bool
+    _warning: str | None
 
-    def __init__(self, url: str, page: str, first_paint_ms: int, dom_content_loaded_ms: int, load_time_ms: int, is_within_threshold: bool):
+    def __init__(self, date: date, url: str, page: str, first_paint_ms: int, dom_content_loaded_ms: int, load_time_ms: int, is_within_threshold: bool, warning: str | None = None, description: str = ""):
 
+        self._date = date
         self._url = url
         self._page = page
         self._first_paint_ms = first_paint_ms
         self._dom_content_loaded_ms = dom_content_loaded_ms
         self._load_time_ms = load_time_ms
         self._is_within_threshold = is_within_threshold
+        self._warning = warning
+        self._description = description
 
     def __str__(self):
-        return f"URL: {self._url}, Page: {self._page}, First Paint: {self._first_paint_ms} ms, DOM Content Loaded: {self._dom_content_loaded_ms} ms, Load Time: {self._load_time_ms} ms, Within Threshold: {self._is_within_threshold}"
+        base = f"URL: {self._url}, Page: {self._page},  Description: {self._description}, First Paint: {self._first_paint_ms} ms, DOM Content Loaded: {self._dom_content_loaded_ms} ms, Load Time: {self._load_time_ms} ms, Within Threshold: {self._is_within_threshold}"
+        return base if self._warning is None else f"{base}, Warning: {self._warning}"
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -65,6 +86,18 @@ class Log:
     def is_within_threshold(self):
         return self._is_within_threshold
 
+    @property
+    def warning(self) -> str | None:
+        return self._warning
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def date(self) -> date:
+        return self._date
+
 
 class Logger:
 
@@ -72,15 +105,14 @@ class Logger:
     _initialized = False
 
     _results: Results
-    # Class-level list shared across all Logger instances. Safe here because
-    # Logger is a singleton — there is always exactly one instance in a run.
-    _logs: list[Log] = []
+    _logs: list[Log]
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = True
             cls._instance._results = Results()
+            cls._instance._logs = []
         return cls._instance
 
     def __init__(self):
@@ -97,6 +129,11 @@ class Logger:
     def add_log(self, log: Log):
         print_info(f"Adding log: {log}")
         self._logs.append(log)
+        msg = f"{log.page}. {log.description}| load={log.load_time_ms}ms fp={log.first_paint_ms}ms dcl={log.dom_content_loaded_ms}ms | url={log.url}"
+        if log.warning:
+            _file_logger.warning(f"{msg} | {log.warning}")
+        else:
+            _file_logger.info(msg)
 
     def get_logs(self) -> list[Log]:
         return self._logs
@@ -108,12 +145,15 @@ class Logger:
         print_info(f"Saving {len(self._logs)} logs...")
         logs_data = [
             {
+                "date": log.date.strftime("%d/%m/%Y, %H:%M:%S"),
                 "page": log.page,
                 "url": log.url,
+                "description": log.description,
                 "first_paint_ms": log.first_paint_ms,
                 "dom_content_loaded_ms": log.dom_content_loaded_ms,
                 "load_time_ms": log.load_time_ms,
-                "is_within_threshold": log.is_within_threshold
+                "is_within_threshold": log.is_within_threshold,
+                **({"warning": log.warning} if log.warning is not None else {}),
             }
             for log in self._logs
         ]

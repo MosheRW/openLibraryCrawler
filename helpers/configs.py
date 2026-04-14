@@ -1,4 +1,9 @@
+import os
+from typing import Literal
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Account:
@@ -26,9 +31,32 @@ class Account:
         return self._password
 
 
+class Thresholds:
+    def __init__(self, search_results_ms: int = 3000, book_ms: int = 2500, profile_ms: int = 2000):
+        self._search_results_ms = search_results_ms
+        self._book_ms = book_ms
+        self._profile_ms = profile_ms
+
+    @property
+    def search_results_ms(self) -> int:
+        return self._search_results_ms
+
+    @property
+    def book_ms(self) -> int:
+        return self._book_ms
+
+    @property
+    def profile_ms(self) -> int:
+        return self._profile_ms
+
+
 class Settings:
     def __init__(self, headless: bool = True, output_format: str = "json", output_directory: str = "results",
-                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log"):
+                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log", thresholds: dict = {
+            "search_results_ms": 3000,
+            "book_ms": 2500,
+            "profile_ms": 2000
+                     }):
         self._headless = headless
         self._output_format = output_format
         self._output_directory = output_directory
@@ -38,6 +66,11 @@ class Settings:
         self._save_results = save_results
         self._log_level = log_level
         self._log_file = log_file
+        self._thresholds = Thresholds(**(thresholds or {
+            "search_results_ms": 3000,
+            "book_ms": 2500,
+            "profile_ms": 2000
+        }))
 
     @property
     def headless(self) -> bool:
@@ -75,12 +108,17 @@ class Settings:
     def log_file(self) -> str:
         return self._log_file
 
+    @property
+    def thresholds(self) -> Thresholds:
+        return self._thresholds
+
 
 class Query:
-    def __init__(self, query: str, max_year: int = 2024, limit: int = 10):
+    def __init__(self, query: str, max_year: int = 2024, limit: int = 10, shelf: Literal['want-to-read', 'already-read'] | None = None):
         self._query = query
         self._max_year = max_year
         self._limit = limit
+        self._shelf: Literal['want-to-read', 'already-read'] | None = shelf
 
     @property
     def query(self) -> str:
@@ -93,6 +131,10 @@ class Query:
     @property
     def limit(self) -> int:
         return self._limit
+
+    @property
+    def shelf(self) -> Literal['want-to-read', 'already-read'] | None:
+        return self._shelf
 
 
 class Config:
@@ -117,7 +159,12 @@ class Config:
         try:
             with open("options.yaml", "r") as f:
                 config_data = yaml.safe_load(f)
-                self._account = Account(**config_data["account"])
+
+                self._account = Account(
+                    email=get_record_from_env("OL_EMAIL"),
+                    username=get_record_from_env("OL_USERNAME"),
+                    password=get_record_from_env("OL_PASSWORD"),
+                )
                 self._queries = [Query(**query)
                                  for query in config_data["queries"]]
                 self._settings = Settings(**config_data["settings"])
@@ -146,3 +193,11 @@ class Config:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+
+def get_record_from_env(key: str) -> str:
+    value = os.environ.get(key)
+    if value is None or value.strip() == "" or not isinstance(value, str):
+        raise Exception(
+            f"the {key} is missing from the environment variables or is empty")
+    return value.strip()

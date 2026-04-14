@@ -3,3 +3,7 @@ __pycache__/
 *.py[cod]
 screenshots/
 results/
+.env
+options.yaml
+app.log
+allure-report/

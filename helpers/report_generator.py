@@ -1,4 +1,8 @@
+import hashlib
 import json
+import uuid
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -6,28 +10,36 @@ def _deduplicate(data: list) -> list:
     seen = set()
     result = []
     for e in data:
-        key = (e["url"], e["page"])
+        key = (e["url"], e["page"], e.get("description", ""))
         if key not in seen:
             seen.add(key)
             result.append(e)
     return result
 
 
+def _load_data(results_path: Path) -> tuple[list, int] | None:
+    report_json = results_path / "performance_report.json"
+    if not report_json.exists():
+        return None
+    with open(report_json) as f:
+        raw = json.load(f)
+    if not raw:
+        return None
+    return _deduplicate(raw), len(raw)
+
+
 def _screenshot_section(screenshots_dir: Path) -> str:
     if not screenshots_dir.exists():
         return ""
 
-    # glob("*.png") only matches files directly in screenshots_dir.
-    # Book-page screenshots are stored in query-named subdirectories and will
-    # not appear in the gallery. Use "**/*.png" to include subdirectories.
-    book_shots = sorted(screenshots_dir.glob("*.png"))
+    book_shots = sorted(screenshots_dir.glob("**/*.png"))
     if not book_shots:
         return ""
 
     items = ""
     for shot in book_shots:
         title = shot.stem.replace("_", " ").replace("  ", " ").strip()
-        src = f"screenshots/{shot.name}"
+        src = f"screenshots/{shot.relative_to(screenshots_dir).as_posix()}"
         items += f"""
         <div class="gallery-item" onclick="openLightbox('{src}', '{title}')">
           <img src="{src}" alt="{title}" loading="lazy">
@@ -52,55 +64,174 @@ def _screenshot_section(screenshots_dir: Path) -> str:
   </div>"""
 
 
+def _generate_junit_xml(results_path: Path, data: list) -> None:
+    page_groups: dict[str, list] = {}
+    for e in data:
+        page_groups.setdefault(e["page"], []).append(e)
+
+    total_failures = sum(1 for e in data if not e["is_within_threshold"])
+    total_time = sum(e["load_time_ms"] for e in data) / 1000
+
+    root = ET.Element("testsuites")
+    root.set("name", "OpenLibrary Performance")
+    root.set("tests", str(len(data)))
+    root.set("failures", str(total_failures))
+    root.set("time", f"{total_time:.2f}")
+
+    for page_name, group in page_groups.items():
+        suite_failures = sum(1 for e in group if not e["is_within_threshold"])
+        suite_time = sum(e["load_time_ms"] for e in group) / 1000
+        first_date = group[0].get("date", "")
+        ts_attr = (datetime.strptime(first_date, "%d/%m/%Y, %H:%M:%S").isoformat()
+                   if first_date else "")
+
+        suite = ET.SubElement(root, "testsuite")
+        suite.set("name", page_name)
+        suite.set("tests", str(len(group)))
+        suite.set("failures", str(suite_failures))
+        suite.set("errors", "0")
+        suite.set("time", f"{suite_time:.2f}")
+        suite.set("timestamp", ts_attr)
+
+        for e in group:
+            name = e.get("description") or e["page"]
+            tc = ET.SubElement(suite, "testcase")
+            tc.set("name", name)
+            tc.set("classname", f"openLibrary.{e['page']}")
+            tc.set("time", f"{e['load_time_ms'] / 1000:.3f}")
+            if not e["is_within_threshold"]:
+                failure = ET.SubElement(tc, "failure")
+                failure.set("message", e.get("warning", "threshold exceeded"))
+                failure.set("type", "PerformanceThresholdExceeded")
+
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+    out = results_path / "report.xml"
+    tree.write(out, encoding="UTF-8", xml_declaration=True)
+    print(f"\033[92m[REPORT]\033[0m JUnit XML saved: {out}")
+
+
+def _generate_allure_results(results_path: Path, data: list) -> None:
+    allure_dir = results_path / "allure-results"
+    allure_dir.mkdir(parents=True, exist_ok=True)
+
+    for e in data:
+        first_date = e.get("date", "")
+        if first_date:
+            dt = datetime.strptime(first_date, "%d/%m/%Y, %H:%M:%S")
+            start_ms = int(dt.timestamp() * 1000)
+        else:
+            start_ms = 0
+        stop_ms = start_ms + e["load_time_ms"]
+
+        raw_key = f"{e['page']}{e.get('description', '')}{e['url']}"
+        history_id = hashlib.md5(raw_key.encode()).hexdigest()
+
+        result = {
+            "uuid": str(uuid.uuid4()),
+            "historyId": history_id,
+            "name": e.get("description") or e["page"],
+            "fullName": f"openLibrary.{e['page']}.{e.get('description', '')}",
+            "status": "passed" if e["is_within_threshold"] else "failed",
+            "start": start_ms,
+            "stop": stop_ms,
+            "labels": [
+                {"name": "parentSuite", "value": "OpenLibrary Performance"},
+                {"name": "suite",       "value": e["page"]},
+                {"name": "feature",     "value": "Page Performance"},
+                {"name": "severity",    "value": "critical"},
+            ],
+            "links": [{"url": e["url"], "name": "Page URL", "type": "link"}],
+            "parameters": [
+                {"name": "First Paint", "value": f"{e['first_paint_ms']}ms"},
+                {"name": "DOM Loaded",  "value": f"{e['dom_content_loaded_ms']}ms"},
+                {"name": "Load Time",   "value": f"{e['load_time_ms']}ms"},
+            ],
+            "statusDetails": {
+                "message": e.get("warning") or None,
+                "trace": "",
+            },
+        }
+        file_path = allure_dir / f"{result['uuid']}-result.json"
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
+
+    categories = [{
+        "name": "Performance Failures",
+        "messageRegex": ".*exceeded threshold.*",
+        "matchedStatuses": ["failed"],
+    }]
+    with open(allure_dir / "categories.json", "w", encoding="utf-8") as f:
+        json.dump(categories, f, indent=2)
+
+    print(f"\033[92m[REPORT]\033[0m Allure results saved: {allure_dir} ({len(data)} results)")
+
+
 def generate_report(results_path: Path) -> None:
-    report_json = results_path / "performance_report.json"
-    if not report_json.exists():
+    result = _load_data(results_path)
+    if result is None:
         return
+    data, raw_count = result
+    duplicates_removed = raw_count - len(data)
 
-    with open(report_json) as f:
-        raw = json.load(f)
-
-    if not raw:
-        return
-
-    data = _deduplicate(raw)
-    duplicates_removed = len(raw) - len(data)
+    _generate_junit_xml(results_path, data)
+    _generate_allure_results(results_path, data)
 
     total = len(data)
     passed = sum(1 for e in data if e["is_within_threshold"])
     failed = total - passed
     pass_rate = round(passed / total * 100) if total else 0
-    avg_load = round(sum(e["load_time_ms"] for e in data) / total) if total else 0
-    avg_fp = round(sum(e["first_paint_ms"] for e in data) / total) if total else 0
-    avg_dcl = round(sum(e["dom_content_loaded_ms"] for e in data) / total) if total else 0
+    avg_load = round(sum(e["load_time_ms"]
+                     for e in data) / total) if total else 0
+    avg_fp = round(sum(e["first_paint_ms"]
+                   for e in data) / total) if total else 0
+    avg_dcl = round(sum(e["dom_content_loaded_ms"]
+                    for e in data) / total) if total else 0
 
     page_types: dict[str, list] = {}
     for e in data:
         page_types.setdefault(e["page"], []).append(e)
 
-    timestamp = results_path.name
+    if data and "date" in data[0]:
+        timestamp = data[0]["date"]
+    else:
+        try:
+            timestamp = datetime.strptime(
+                results_path.name, "%Y%m%d%H%M%S").strftime("%d %b %Y, %H:%M:%S")
+        except ValueError:
+            timestamp = results_path.name
 
-    bar_labels = json.dumps([f"{e['page'].replace('_page', '')} #{i + 1}" for i, e in enumerate(data)])
+    bar_labels = json.dumps([e.get(
+        "description") or f"{e['page'].replace('_page', '')} #{i + 1}" for i, e in enumerate(data)])
     bar_load = json.dumps([e["load_time_ms"] for e in data])
     bar_fp = json.dumps([e["first_paint_ms"] for e in data])
     bar_dcl = json.dumps([e["dom_content_loaded_ms"] for e in data])
-    bar_colors = json.dumps(["rgba(34,197,94,0.85)" if e["is_within_threshold"] else "rgba(239,68,68,0.85)" for e in data])
-    bar_border = json.dumps(["#22c55e" if e["is_within_threshold"] else "#ef4444" for e in data])
+    bar_colors = json.dumps(
+        ["rgba(34,197,94,0.85)" if e["is_within_threshold"] else "rgba(239,68,68,0.85)" for e in data])
+    bar_border = json.dumps(
+        ["#22c55e" if e["is_within_threshold"] else "#ef4444" for e in data])
 
     table_rows = ""
     for i, e in enumerate(data):
+        date = datetime.strptime(
+            e["date"], "%d/%m/%Y, %H:%M:%S").strftime("%d %b %Y, %H:%M:%S") if "date" in e else "—"
         status = "pass" if e["is_within_threshold"] else "fail"
         label = "PASS" if e["is_within_threshold"] else "FAIL"
         short_url = e["url"].replace("https://openlibrary.org", "...")
+        desc = e.get("description") or "—"
+        warning_html = f' <span class="badge warn" title="{e["warning"]}">\u26a0 WARN</span>' if e.get(
+            "warning") else ""
         table_rows += f"""
         <tr class="{status}-row" data-load="{e['load_time_ms']}" data-fp="{e['first_paint_ms']}" data-dcl="{e['dom_content_loaded_ms']}">
             <td class="num">{i + 1}</td>
+            <td class="desc-cell">{date}</td>            
             <td><span class="page-tag">{e['page'].replace('_', ' ')}</span></td>
+            <td class="desc-cell">{desc}</td>
             <td class="url-cell"><a href="{e['url']}" target="_blank" title="{e['url']}">{short_url}</a></td>
             <td class="num">{e['first_paint_ms']}</td>
             <td class="num">{e['dom_content_loaded_ms']}</td>
             <td class="num">{e['load_time_ms']}</td>
-            <td><span class="badge {status}">{label}</span></td>
+            <td><div class="badge-container"><span class="badge {status}">{label}</span>{warning_html}</div></td>
         </tr>"""
 
     page_type_cards = ""
@@ -265,8 +396,18 @@ def generate_report(results_path: Path) -> None:
   .lb-close:hover {{ background: var(--red); border-color: var(--red); }}
 
   /* ── Table ── */
-  .table-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: .875rem; }}
+  .table-wrap {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: fit-content; }}
+  table {{ width: auto; border-collapse: collapse; font-size: .875rem; }}
+  #resultsTable {{ table-layout: fixed; }}
+  #resultsTable th:nth-child(1) {{ width: 44px; }}
+  #resultsTable th:nth-child(1) {{ width: 100px; }}
+  #resultsTable th:nth-child(2) {{ width: 180px; }}
+  #resultsTable th:nth-child(3) {{ width: 250px; }}
+  #resultsTable th:nth-child(4) {{ width: 200px; }}
+  #resultsTable th:nth-child(5) {{ width: 95px; }}
+  #resultsTable th:nth-child(6) {{ width: 100px; }}
+  #resultsTable th:nth-child(7) {{ width: 95px; }}
+  #resultsTable th:nth-child(8) {{ width: 170px; }}
   thead {{ background: var(--surface2); }}
   th {{
     padding: .9rem 1rem; text-align: left; font-size: .75rem; font-weight: 600;
@@ -282,19 +423,24 @@ def generate_report(results_path: Path) -> None:
   tr.fail-row:hover {{ background: rgba(239,68,68,.05); }}
   .num {{ font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }}
   td.num {{ color: var(--text); }}
+  .url-container {{display: flex; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}}
+  .url-cell {{ overflow: hidden; white-space: nowrap; text-overflow: ellipsis;width: 100%; max-width: 300px; }}
   .url-cell a {{ color: #818cf8; text-decoration: none; font-size: .8rem; }}
   .url-cell a:hover {{ color: #a5b4fc; text-decoration: underline; }}
   .page-tag {{
     display: inline-block; padding: .2rem .6rem; border-radius: 99px;
     background: var(--surface2); border: 1px solid var(--border);
-    font-size: .72rem; font-weight: 600; color: var(--muted); white-space: nowrap;
-  }}
+    font-size: .72rem; font-weight: 600; color: var(--muted); white-space: nowrap; }}
+  .badge-container {{ display: flex; flex-flow: column; align-items: center; gap: .4rem; }}
   .badge {{
-    display: inline-block; padding: .25rem .7rem; border-radius: 99px;
+    display: inline-block; padding: .25rem .7rem; border-radius: 99px; width: max-content;
+    
     font-size: .72rem; font-weight: 700; letter-spacing: .5px;
   }}
-  .badge.pass {{ background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }}
-  .badge.fail {{ background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }}
+  .badge.pass {{ background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3);align-self: center; justify-self: center; }}
+  .badge.fail {{ background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3);align-self: center; justify-self: center; }}
+  .badge.warn {{ background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); margin-left: .4rem; cursor: help;align-self: center; justify-self: center; }}
+  .desc-cell {{ font-size: .78rem; color: var(--muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
   /* ── Footer ── */
   footer {{ text-align: center; color: var(--muted); font-size: .75rem; padding: 2rem 1rem; border-top: 1px solid var(--border); }}
@@ -387,9 +533,11 @@ def generate_report(results_path: Path) -> None:
       <table id="resultsTable">
         <thead>
           <tr>
-            <th class="num">#</th>
+            <th class="num">#</th>            
+            <th>timestamp</th>
             <th>Page Type</th>
-            <th>URL</th>
+            <th>Description</th>
+             <th>URL</th>
             <th class="num" data-col="fp">First Paint <span class="sort-icon">&#8597;</span></th>
             <th class="num" data-col="dcl">DOM Loaded <span class="sort-icon">&#8597;</span></th>
             <th class="num" data-col="load">Load Time <span class="sort-icon">&#8597;</span></th>
@@ -485,3 +633,9 @@ def generate_report(results_path: Path) -> None:
         f.write(html)
 
     print(f"\033[92m[REPORT]\033[0m HTML report saved: {out}")
+
+
+if __name__ == "__main__":
+    path = Path('results', '20260413172108')
+    generate_report(path)
+    print("Report generation complete.")
