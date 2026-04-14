@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 
@@ -144,7 +144,8 @@ def _generate_allure_results(results_path: Path, data: list) -> None:
             "links": [{"url": e["url"], "name": "Page URL", "type": "link"}],
             "parameters": [
                 {"name": "First Paint", "value": f"{e['first_paint_ms']}ms"},
-                {"name": "DOM Loaded",  "value": f"{e['dom_content_loaded_ms']}ms"},
+                {"name": "DOM Loaded",
+                    "value": f"{e['dom_content_loaded_ms']}ms"},
                 {"name": "Load Time",   "value": f"{e['load_time_ms']}ms"},
             ],
             "statusDetails": {
@@ -164,7 +165,8 @@ def _generate_allure_results(results_path: Path, data: list) -> None:
     with open(allure_dir / "categories.json", "w", encoding="utf-8") as f:
         json.dump(categories, f, indent=2)
 
-    print(f"\033[92m[REPORT]\033[0m Allure results saved: {allure_dir} ({len(data)} results)")
+    print(
+        f"\033[92m[REPORT]\033[0m Allure results saved: {allure_dir} ({len(data)} results)")
 
 
 def generate_report(results_path: Path) -> None:
