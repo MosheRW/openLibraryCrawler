@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 import yaml
 from dotenv import load_dotenv
 
@@ -51,7 +52,11 @@ class Thresholds:
 
 class Settings:
     def __init__(self, headless: bool = True, output_format: str = "json", output_directory: str = "results",
-                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log", thresholds: dict = None):
+                 initialize_book_shelves: bool = True, print_info: bool = True, print_errors: bool = True, save_results: bool = True, log_level: str = "INFO", log_file: str = "app.log", thresholds: dict = {
+            "search_results_ms": 3000,
+            "book_ms": 2500,
+            "profile_ms": 2000
+                     }):
         self._headless = headless
         self._output_format = output_format
         self._output_directory = output_directory
@@ -61,7 +66,11 @@ class Settings:
         self._save_results = save_results
         self._log_level = log_level
         self._log_file = log_file
-        self._thresholds = Thresholds(**(thresholds or {}))
+        self._thresholds = Thresholds(**(thresholds or {
+            "search_results_ms": 3000,
+            "book_ms": 2500,
+            "profile_ms": 2000
+        }))
 
     @property
     def headless(self) -> bool:
@@ -105,10 +114,11 @@ class Settings:
 
 
 class Query:
-    def __init__(self, query: str, max_year: int = 2024, limit: int = 10):
+    def __init__(self, query: str, max_year: int = 2024, limit: int = 10, shelf: Literal['want-to-read', 'already-read'] | None = None):
         self._query = query
         self._max_year = max_year
         self._limit = limit
+        self._shelf: Literal['want-to-read', 'already-read'] | None = shelf
 
     @property
     def query(self) -> str:
@@ -121,6 +131,10 @@ class Query:
     @property
     def limit(self) -> int:
         return self._limit
+
+    @property
+    def shelf(self) -> Literal['want-to-read', 'already-read'] | None:
+        return self._shelf
 
 
 class Config:
