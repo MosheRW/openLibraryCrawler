@@ -7,3 +7,5 @@ results/
 options.yaml
 app.log
 allure-report/
+options.yaml
+GRADE.md
