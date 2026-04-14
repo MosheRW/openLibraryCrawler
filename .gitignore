@@ -6,3 +6,4 @@ results/
 .env
 options.yaml
 app.log
+allure-report/
