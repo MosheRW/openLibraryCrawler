@@ -97,7 +97,7 @@ settings:
   log_level: "INFO"
   log_file: "app.log"
 
-  thresholds:
+thresholds:
     search_results_ms: 3000        # Max acceptable load time for search results page
     book_ms: 2500                  # Max acceptable load time for individual book pages
     profile_ms: 2000               # Max acceptable load time for user profile page
