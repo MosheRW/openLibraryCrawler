@@ -1,7 +1,3 @@
-account:
-  email: "moshewinberg+tests@gmail.com"
-  username: "m0526750830"
-  password: "b6HhJp2sF3g4R-Xnnnm"
 queries:
   - query: "python programming"
     max_year: 2024
@@ -18,7 +14,7 @@ queries:
     max_year: 2024
     limit: 5
 settings:
-  headless: false
+  headless: true
   output_format: "json"
   output_directory: "results"
   initialize_book_shelves: true
