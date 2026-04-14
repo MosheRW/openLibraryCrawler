@@ -91,8 +91,10 @@ class SearchResultsPage(BasePage):
         # deduplicates the result — so fewer books than `limit` may be returned silently
         # if the search has fewer results than requested.
         if len(books) < limit:
-            await self.go_to_next_page()
-            return await self.get_books(limit, books)
+            if await self.go_to_next_page():
+                return await self.get_books(limit, books)
+            else:
+                return books
         else:
             return books
 
@@ -101,7 +103,7 @@ class SearchResultsPage(BasePage):
         books_set = [book.url for book in books if book.url is not None]
         return books_set
 
-    async def go_to_next_page(self) -> None:
+    async def go_to_next_page(self) -> bool:
         next_button = await self._page.query_selector(
             searchResultsPageSelector["next_button"])
 
@@ -110,6 +112,8 @@ class SearchResultsPage(BasePage):
             await self._page.wait_for_load_state("load")
             self.current_page += 1
             await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
+            return True
+        return False
 
 
 async def search_results_page_factory(page: Page, query: str = "") -> SearchResultsPage:
