@@ -3,7 +3,7 @@ from helpers.browser import Browser
 from helpers.logger import print_error
 from helpers.results import title_to_filename
 from pages.inheriting_pages.base_page import BasePage
-from pages.inheriting_pages.search_results_page import SearchResultsPage, search_results_page_factory
+from pages.inheriting_pages.search_results_page import SearchResultsPage
 
 
 home_page_selectors = {
@@ -56,11 +56,11 @@ class HomePage(BasePage):
         await self._page.fill(home_page_selectors["input_search"], query)
         await self._page.wait_for_selector(home_page_selectors["search_button"])
         await self._page.click(home_page_selectors["search_button"])
-        
+
         # Page number is always 1 here — this is the initial search results page.
         # Subsequent pages are captured by SearchResultsPage.go_to_next_page().
         await self.take_screenshot(f"search_results_page_{1}", title_to_filename(f"{title}_{author}_{year}"))
-        return await search_results_page_factory(self._page, query)
+        return await SearchResultsPage.create(self._page, query)
 
     async def search_books_by_title_under_year(self, query: str, year: int) -> SearchResultsPage:
         return await self._search_books(title=query, year=year)

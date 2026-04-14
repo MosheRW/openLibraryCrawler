@@ -34,6 +34,13 @@ class SearchResultsPage(BasePage):
         self.logger.add_log(Log(url=self._page.url, date=datetime.now(), page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
                             "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
+    @classmethod
+    async def create(cls, page: Page, query: str = "") -> "SearchResultsPage":
+        results = SearchResultsPage(page, query)
+        await results.initialize()
+        await results.navigate()
+        return results
+
     async def navigate(self) -> None:
         await self._page.reload()
         await self._log()
@@ -114,9 +121,3 @@ class SearchResultsPage(BasePage):
             await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
             return True
         return False
-
-
-async def search_results_page_factory(page: Page, query: str = "") -> SearchResultsPage:
-    results = SearchResultsPage(page, query)
-    await results.navigate()
-    return results
