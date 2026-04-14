@@ -1,11 +1,11 @@
-import asyncio
-
+from datetime import datetime
 from playwright.async_api import Page
-from helpers.logger import Log
+from helpers.logger import Log, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from utils.book import Book
+from helpers.configs import Config
 
 searchResultsPageSelector = {
     "results_list_container": "li.searchResultItem",
@@ -18,35 +18,40 @@ searchResultsPageSelector = {
 
 
 class SearchResultsPage(BasePage):
+
     def __init__(self, page: Page, query: str = ""):
         super().__init__(page)
         self.current_page = 1
         self.query = query
-        # _log() was previously fired as a fire-and-forget task here, but moved to
-        # an explicit await inside navigate() to ensure errors surface immediately.
 
     async def _log(self):
-        des = await measure_page_performance(self.page, self.page.url, 3000)
-        self.logger.add_log(Log(url=self.page.url, page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+        threshold = Config().settings.thresholds.search_results_ms
+        des = await measure_page_performance(self._page, self._page.url, threshold)
+        warning = None
+        if not des["is_within_threshold"]:
+            warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
+            print_warning(f"[PERF] search_results_page: {warning}")
+        self.logger.add_log(Log(url=self._page.url, date=datetime.now(), page="search_results_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
 
     async def navigate(self) -> None:
-        await self.page.goto("https://openlibrary.org/")
+        await self._page.reload()
         await self._log()
 
     async def get_books(self, limit: int = 5, prev_books: list[Book] | None = None) -> list[Book]:
-        await self.page.wait_for_selector(
+        await self._page.wait_for_selector(
             searchResultsPageSelector["results_list_container"], timeout=5000)
-        book_elements = await self.page.query_selector_all(
+        book_elements = await self._page.query_selector_all(
             searchResultsPageSelector["results_list_container"])
 
         current_limit = limit - len(prev_books) if prev_books else limit
         books: list[Book] = []
+        books_set = set()
 
         for element in book_elements:
-            if len(books) >= current_limit:
+            if len(books) >= current_limit or len(books_set) >= current_limit:
                 break
-            
+
             title_element = await element.query_selector(
                 searchResultsPageSelector["title"])
             author_element = await element.query_selector(
@@ -73,7 +78,10 @@ class SearchResultsPage(BasePage):
             year = int(year_text) if year_text.isdigit() else 0
             url = f"https://openlibrary.org/{url_element.split('/')[1]}/{url_element.split('/')[2]}" if url_element else None
 
-            books.append(Book(title, author, year, url))
+            book = Book(title, author, year, url)
+            if book.url not in books_set:
+                books.append(book)
+                books_set.add(book.url)
 
         if prev_books is not None:
             books = prev_books + books
@@ -83,22 +91,32 @@ class SearchResultsPage(BasePage):
         # deduplicates the result — so fewer books than `limit` may be returned silently
         # if the search has fewer results than requested.
         if len(books) < limit:
-            await self.go_to_next_page()
-            return await self.get_books(limit, books)
+            if await self.go_to_next_page():
+                return await self.get_books(limit, books)
+            else:
+                return books
         else:
             return books
 
     async def get_books_urls(self, limit: int = 5) -> list[str]:
         books = await self.get_books(limit)
-        books_set = set([book.url for book in books if book.url is not None])
-        return list(books_set)
+        books_set = [book.url for book in books if book.url is not None]
+        return books_set
 
-    async def go_to_next_page(self) -> None:
-        next_button = await self.page.query_selector(
+    async def go_to_next_page(self) -> bool:
+        next_button = await self._page.query_selector(
             searchResultsPageSelector["next_button"])
 
         if next_button:
             await next_button.click()
-            await self.page.wait_for_load_state("load")
+            await self._page.wait_for_load_state("load")
             self.current_page += 1
             await self.take_screenshot(f"search_results_page_{self.current_page}", title_to_filename(self.query))
+            return True
+        return False
+
+
+async def search_results_page_factory(page: Page, query: str = "") -> SearchResultsPage:
+    results = SearchResultsPage(page, query)
+    await results.navigate()
+    return results

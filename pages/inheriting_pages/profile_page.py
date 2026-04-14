@@ -1,15 +1,12 @@
+from datetime import datetime
+
 from playwright.async_api import Page
 from helpers.configs import Config
-from helpers.logger import Log, print_error, print_info
+from helpers.logger import Log, print_error, print_info, print_warning
 from helpers.results import title_to_filename
 from methods.measure_page_performance import measure_page_performance
 from pages.inheriting_pages.base_page import BasePage
 from helpers.browser import Browser
-
-# OpenLibrary's reading-list UI goes stale after several successive book removals:
-# the "remove" button stops responding. Reloading every N iterations resets the DOM.
-# The value 5 was found empirically as the point where the UI typically stalls.
-ITERATIONS_BEFORE_RELOAD = 5
 
 profile_page_selector = {
     "want to read count": "a[data-ol-link-track='MyBooksSidebar|WantToRead'] > span.li-count",
@@ -30,18 +27,31 @@ class ProfilePage(BasePage):
         config = Config()
         await instance.navigate(config.account.username)
         await instance.initialize()
-        des = await measure_page_performance(instance.page, instance.page.url, 2000)
-        instance.logger.add_log(Log(url=instance.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
         return instance
 
-    async def navigate(self, username: str) -> None:
-        await self.page.goto(f"https://openlibrary.org/people/{username}/books")
-        des = await measure_page_performance(self.page, self.page.url, 2000)
-        self.logger.add_log(Log(url=self.page.url, page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
-                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"]))
+    async def navigate(self, username: str, count: int = 0) -> None:
+        await self._page.goto(f"https://openlibrary.org/people/{username}/books")
+        if await self.is_503_error():
+            print_error(
+                "503 error detected on profile page, retrying navigation...")
+            if count <= 5:
+                await self.navigate(username, count + 1)
+            else:
+                print_error(
+                    "Exceeded maximum retry attempts for loading profile page.")
+                raise Exception(
+                    "Failed to load profile page after multiple attempts.")
 
-    async def _get_quantity(self, selector: str) -> int:
+        threshold = Config().settings.thresholds.profile_ms
+        des = await measure_page_performance(self._page, self._page.url, threshold)
+        warning = None
+        if not des["is_within_threshold"]:
+            warning = f"load_time {des['load_time_ms']}ms exceeded threshold {threshold}ms"
+            print_warning(f"[PERF] profile_page: {warning}")
+        self.logger.add_log(Log(url=self._page.url, date=datetime.now(), page="profile_page", dom_content_loaded_ms=des["dom_content_loaded_ms"], first_paint_ms=des[
+                            "first_paint_ms"], load_time_ms=des["load_time_ms"], is_within_threshold=des["is_within_threshold"], warning=warning))
+
+    async def _get_quantity(self, selector: str, dont_reload: bool = False) -> int:
         """
         Retrieves the quantity of books for a given shelf by its selector.
         It first reloads the page to ensure the data is up-to-date, then waits for the element corresponding to the selector to be available.
@@ -52,9 +62,10 @@ class ProfilePage(BasePage):
         # Reload is required because OpenLibrary updates sidebar counts asynchronously.
         # Note: get_want_and_already_read_quantities calls this method twice,
         # resulting in two full page reloads per assertion.
-        await self.page.reload()
-        await self.page.wait_for_selector(profile_page_selector[selector])
-        element = await self.page.query_selector(profile_page_selector[selector])
+        if not dont_reload:
+            await self._page.reload()
+        await self._page.wait_for_selector(profile_page_selector[selector])
+        element = await self._page.query_selector(profile_page_selector[selector])
 
         if element is None:
             print_error(f"Element for selector '{selector}' not found.")
@@ -67,14 +78,14 @@ class ProfilePage(BasePage):
             print_error(f"Could not convert '{quantity_text}' to an integer.")
             return 0
 
-    async def get_want_to_read_quantity(self) -> int:
-        return await self._get_quantity("want to read count")
+    async def get_want_to_read_quantity(self, dont_reload: bool = False) -> int:
+        return await self._get_quantity("want to read count", dont_reload)
 
-    async def get_currently_reading_quantity(self) -> int:
-        return await self._get_quantity("currently reading count")
+    async def get_currently_reading_quantity(self, dont_reload: bool = False) -> int:
+        return await self._get_quantity("currently reading count", dont_reload)
 
-    async def get_already_read_quantity(self) -> int:
-        return await self._get_quantity("already read count")
+    async def get_already_read_quantity(self, dont_reload: bool = False) -> int:
+        return await self._get_quantity("already read count", dont_reload)
 
     async def get_want_and_already_read_quantities(self, title: str | None = None) -> tuple[int, int]:
         if title is not None:
@@ -83,43 +94,43 @@ class ProfilePage(BasePage):
             await self.take_screenshot(name="profile_page_quantities")
 
         want_to_read = await self.get_want_to_read_quantity()
-        already_read = await self.get_already_read_quantity()
+        already_read = await self.get_already_read_quantity(True)
         return want_to_read, already_read
 
     async def navigate_to_want_to_read_shelf(self) -> None:
-        await self.page.wait_for_selector(profile_page_selector["want to read count"])
-        await self.page.click(profile_page_selector["want to read count"])
+        await self._page.wait_for_selector(profile_page_selector["want to read count"])
+        await self._page.click(profile_page_selector["want to read count"])
 
     async def navigate_to_already_read_shelf(self) -> None:
-        await self.page.wait_for_selector(profile_page_selector["already read count"])
-        await self.page.click(profile_page_selector["already read count"])
+        await self._page.wait_for_selector(profile_page_selector["already read count"])
+        await self._page.click(profile_page_selector["already read count"])
 
     async def _clear_shelf(self, shelf_click_selector: str) -> None:
         """
         Clears a shelf by repeatedly deactivating the first book until the shelf is empty. It handles potential issues with page updates by checking if the URL changes after each click and waiting if it doesn't. It also reloads the page after every ITERATIONS_BEFORE_RELOAD attempts to ensure the DOM is updated.
         """
 
-        await self.page.click(shelf_click_selector)
-        counter = 0
+        await self._page.click(shelf_click_selector)
 
         while True:
-            button = await self.page.query_selector(profile_page_selector["clear shelf"])
+            button = await self._page.query_selector(profile_page_selector["clear shelf"])
 
             if button is None:
+                print_info("No more books to remove from this shelf.")
                 break
             else:
-                current_url = self.page.url
+                current_url = self._page.url
                 await button.click()
 
-                if self.page.url == current_url:
-                    await self.page.wait_for_timeout(200)
-                else:
-                    await self.page.go_back()
+                print_info("Book removed, checking for next one...")
 
-                if counter == ITERATIONS_BEFORE_RELOAD:
-                    await self.page.reload()
-                    counter = 0
-                counter += 1
+                if self._page.url == current_url:
+                    await self._page.wait_for_timeout(1000)
+                else:
+                    await self._page.go_back()
+                    continue
+
+                await self._page.reload()
 
     async def remove_all_books_from_shelves(self) -> None:
         print_info("Clearing 'Want to Read' shelf...")

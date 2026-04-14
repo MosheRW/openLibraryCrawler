@@ -28,7 +28,8 @@ openLibraryCrawler/
 │   ├── configs.py                   # Config data classes (Account, Settings, Query)
 │   ├── logger.py                    # Performance metrics collector & JSON reporter
 │   ├── results.py                   # Timestamped results directory manager
-│   └── screenshots_taker.py         # Screenshot capture handler
+│   ├── screenshots_taker.py         # Screenshot capture handler
+│   └── report_generator.py          # HTML report generator (Chart.js, dark theme)
 │
 ├── pages/                           # Page Object Model layer
 │   ├── auth_page.py                 # Login automation
@@ -65,7 +66,7 @@ openLibraryCrawler/
 ### 1. Install dependencies
 
 ```bash
-pip install playwright pyyaml
+pip install -r requirements.txt
 playwright install chromium
 ```
 
@@ -78,11 +79,6 @@ cp options.example.yaml options.yaml
 Edit `options.yaml`:
 
 ```yaml
-account:
-  email: "your@email.com"
-  username: "your_username"
-  password: "your_password"
-
 queries:
   - query: "python programming"
     max_year: 2024
@@ -100,35 +96,66 @@ settings:
   save_results: true
   log_level: "INFO"
   log_file: "app.log"
+
+  thresholds:
+    search_results_ms: 3000        # Max acceptable load time for search results page
+    book_ms: 2500                  # Max acceptable load time for individual book pages
+    profile_ms: 2000               # Max acceptable load time for user profile page
 ```
 
-> **Note:** `options.yaml` contains plaintext credentials — keep it out of version control. It is already listed in `.gitignore`.
 
+> **`.env` file:** copy `.env.example` to `.env` and fill in your credentials.
+```bash
+cp .env.example .env
+```
+
+```env
+OL_EMAIL="your_email@example.com"
+OL_USERNAME="your_username"
+OL_PASSWORD="your_password"
+```
 ## Usage
 
 ```bash
 python main.py
 ```
 
+## Docker
+
+```bash
+# Build
+docker build -t openlibrary-crawler .
+
+# Run — credentials via .env, results persisted to host
+docker run --env-file .env -v "$(pwd)/results:/app/results" openlibrary-crawler
+```
+
+Results land in `results/<timestamp>/` on the host after the run.
+
 The crawler will authenticate, run all configured queries, and write output to `results/<timestamp>/`.
 
 ## Output
 
-| File | Description |
-|------|-------------|
-| `results/<timestamp>/performance_report.json` | Page load metrics (first paint, DOM ready, load time) per query |
-| `results/<timestamp>/screenshots/` | Screenshots captured during search and book interactions |
+| File                                          | Description                                                                         |
+| --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `results/<timestamp>/performance_report.json` | Page load metrics (first paint, DOM ready, load time) per query                     |
+| `results/<timestamp>/allure_results/`         | Allure JSON results for interactive report generation                               |
+| `results/<timestamp>/report.html`             | Interactive HTML report with charts, screenshot gallery, and sortable metrics table |
+| `results/<timestamp>/screenshots/`            | Screenshots captured during search and book interactions                            |
 
 ## Configuration reference
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `account.email` | string | Open Library login email |
-| `account.username` | string | Open Library username |
-| `account.password` | string | Open Library password |
-| `queries[].query` | string | Book search term |
-| `queries[].max_year` | int | Only include books published on or before this year |
-| `queries[].limit` | int | Maximum number of books to process per query |
-| `settings.headless` | bool | Run browser without a visible window |
-| `settings.initialize_book_shelves` | bool | Clear all shelves before starting |
-| `settings.save_results` | bool | Write screenshots and performance report to disk |
+| file         | Key                                     | Type   | Description                                                                 |
+| ------------ | --------------------------------------- | ------ | --------------------------------------------------------------------------- |
+| options.yaml | `queries[].query`                       | string | Book search term                                                            |
+| options.yaml | `queries[].max_year`                    | int    | Only include books published on or before this year                         |
+| options.yaml | `queries[].limit`                       | int    | Maximum number of books to process per query                                |
+| options.yaml | `settings.headless`                     | bool   | Run browser without a visible window                                        |
+| options.yaml | `settings.initialize_book_shelves`      | bool   | Clear all shelves before starting                                           |
+| options.yaml | `settings.save_results`                 | bool   | Write screenshots and performance report to disk                            |
+| options.yaml | `settings.thresholds.search_results_ms` | int    | Max acceptable load time (ms) for the search results page (default: `3000`) |
+| options.yaml | `settings.thresholds.book_ms`           | int    | Max acceptable load time (ms) for individual book pages (default: `2500`)   |
+| options.yaml | `settings.thresholds.profile_ms`        | int    | Max acceptable load time (ms) for the user profile page (default: `2000`)   |
+| .env         | `OL_EMAIL`                              | string | Open Library login email                                                    |
+| .env         | `OL_USERNAME`                           | string | Open Library username                                                       |
+| .env         | `OL_PASSWORD`                           | string | Open Library password                                                       |

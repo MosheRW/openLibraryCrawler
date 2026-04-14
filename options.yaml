@@ -1,22 +1,20 @@
-account:
-  email: "REDACTED_EMAIL"
-  username: "REDACTED_USERNAME"
-  password: "REDACTED_PASSWORD"
 queries:
   - query: "python programming"
     max_year: 2024
-    limit: 10
+    limit: 3
   - query: "data science"
     max_year: 2024
-    limit: 15
+    limit: 4
+    shelf: "want-to-read"
   - query: "romance novels"
     max_year: 2024
-    limit: 12
+    limit: 2
+    shelf: "already-read"
   - query: "history books"
     max_year: 2024
-    limit: 18
+    limit: 5
 settings:
-  headless: false
+  headless: true
   output_format: "json"
   output_directory: "results"
   initialize_book_shelves: true
@@ -24,3 +22,7 @@ settings:
   save_results: true
   log_level: "INFO"
   log_file: "app.log"
+  thresholds:
+    search_results_ms: 3000
+    book_ms: 2500
+    profile_ms: 2000
